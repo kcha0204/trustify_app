@@ -1,0 +1,7 @@
+fastapi
+uvicorn[standard]
+python-dotenv
+pillow
+easyocr
+azure-ai-contentsafety
+azure-core
