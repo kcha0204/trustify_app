@@ -24,7 +24,8 @@ void main() {
     // Wait for all animations and timers to complete
     await tester.pumpAndSettle(const Duration(seconds: 5));
 
-    // Verify that we're now on the home screen
-    expect(find.text('Home goes here'), findsOneWidget);
+    // Verify that we're now on the home screen with the gaming cards
+    expect(find.text('🛡️ SCAN & PROTECT'), findsOneWidget);
+    expect(find.text('📊 CYBER INTEL'), findsOneWidget);
   });
 }
