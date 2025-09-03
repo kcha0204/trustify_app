@@ -58,9 +58,9 @@ def main():
         sys.exit(1)
     
     print("✅ All checks passed!")
-    print("🌐 Starting server on http://localhost:8080")
-    print("📱 Flutter app should use http://10.0.2.2:8080 for Android emulator")
-    print("📱 For real device, use your computer's IP address")
+    print("🌐 Starting server on http://0.0.0.0:8080")
+    print("📱 Flutter app should use http://10.166.189.111:8080 for real device")
+    print("📱 For Android emulator, use http://10.0.2.2:8080")
     print("="*50)
     
     # Start the server

@@ -39,7 +39,7 @@ class AiDetectionService {
   AiDetectionService(this.baseUrl);
 
   Future<AiDetectionResult> analyzeText(String text) async {
-    final uri = Uri.parse('$baseUrl/analyze/text');
+    final uri = Uri.parse('$baseUrl/analyze/text/enhanced');
     final res = await http.post(
       uri,
       headers: {'Content-Type': 'application/json'},
@@ -52,7 +52,7 @@ class AiDetectionService {
   }
 
   Future<AiDetectionResult> analyzeScreenshot(File imageFile) async {
-    final uri = Uri.parse('$baseUrl/analyze/screenshot');
+    final uri = Uri.parse('$baseUrl/analyze/screenshot/enhanced');
     final req = http.MultipartRequest('POST', uri)
       ..files.add(await http.MultipartFile.fromPath('file', imageFile.path));
     final streamed = await req.send();
