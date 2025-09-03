@@ -72,84 +72,100 @@ class HomeScreen extends StatelessWidget {
           SafeArea(
             child: Padding(
               padding: const EdgeInsets.all(16.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Cyber Warrior Welcome Message
-                  _CyberWarriorWelcome(),
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  return SingleChildScrollView(
+                    child: ConstrainedBox(
+                      constraints: BoxConstraints(
+                        minHeight: constraints.maxHeight,
+                      ),
+                      child: IntrinsicHeight(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // Cyber Warrior Welcome Message
+                            _CyberWarriorWelcome(),
 
-                  const SizedBox(height: 40),
+                            const SizedBox(height: 40),
 
-                  // Two main feature cards arranged side by side
-                  Expanded(
-                    child: Column(
-                      children: [
-                        // First row of cards
-                        Expanded(
-                          child: Row(
-                            children: [
-                              // First Card: Harmful Content Detection
-                              Expanded(
-                                child: _GameCard(
-                                  title: "🛡️ SCAN & PROTECT",
-                                  subtitle: "AI-Powered Content Shield",
-                                  gradientColors: const [
-                                    Color(0xFF00FF88), // Neon Green
-                                    Color(0xFF00D4FF), // Cyber Blue
-                                  ],
-                                  iconData: Icons.security,
-                                  onTap: () {
-                                    Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (
-                                            _) => const ContentDetectionPage(),
-                                      ),
-                                    );
-                                  },
-                                ),
+                            // Two main feature cards arranged side by side
+                            Expanded(
+                              child: Column(
+                                children: [
+                                  // First row of cards
+                                  Flexible(
+                                    child: Row(
+                                      children: [
+                                        // First Card: Harmful Content Detection
+                                        Expanded(
+                                          child: _GameCard(
+                                            title: "🛡️ SCAN & PROTECT",
+                                            subtitle: "AI-Powered Content Shield",
+                                            gradientColors: const [
+                                              Color(0xFF00FF88), // Neon Green
+                                              Color(0xFF00D4FF), // Cyber Blue
+                                            ],
+                                            iconData: Icons.security,
+                                            onTap: () {
+                                              Navigator.push(
+                                                context,
+                                                MaterialPageRoute(
+                                                  builder: (
+                                                      _) => const ContentDetectionPage(),
+                                                ),
+                                              );
+                                            },
+                                          ),
+                                        ),
+
+                                        const SizedBox(width: 12),
+
+                                        // Second Card: Cyber Trends Dashboard
+                                        Expanded(
+                                          child: _GameCard(
+                                            title: "📊 CYBER INTEL",
+                                            subtitle: "Victoria Threat Dashboard",
+                                            gradientColors: const [
+                                              Color(0xFFFF3366),
+                                              // Electric Pink
+                                              Color(0xFF9D4EDD),
+                                              // Gaming Purple
+                                            ],
+                                            iconData: Icons.analytics,
+                                            onTap: () {
+                                              Navigator.push(
+                                                context,
+                                                MaterialPageRoute(
+                                                  builder: (
+                                                      _) => const CyberTrendsPage(),
+                                                ),
+                                              );
+                                            },
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+
+                                  // Space for future cards (second row)
+                                  const SizedBox(height: 12),
+
+                                  // Placeholder for future cards
+                                  Flexible(
+                                    child: Container(
+                                      // This space is reserved for future cards
+                                      child: const SizedBox(),
+                                    ),
+                                  ),
+                                ],
                               ),
-
-                              const SizedBox(width: 12),
-
-                              // Second Card: Cyber Trends Dashboard
-                              Expanded(
-                                child: _GameCard(
-                                  title: "📊 CYBER INTEL",
-                                  subtitle: "Victoria Threat Dashboard",
-                                  gradientColors: const [
-                                    Color(0xFFFF3366), // Electric Pink
-                                    Color(0xFF9D4EDD), // Gaming Purple
-                                  ],
-                                  iconData: Icons.analytics,
-                                  onTap: () {
-                                    Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (_) => const CyberTrendsPage(),
-                                      ),
-                                    );
-                                  },
-                                ),
-                              ),
-                            ],
-                          ),
+                            ),
+                          ],
                         ),
-
-                        // Space for future cards (second row)
-                        const SizedBox(height: 12),
-
-                        // Placeholder for future cards
-                        Expanded(
-                          child: Container(
-                            // This space is reserved for future cards
-                            child: const SizedBox(),
-                          ),
-                        ),
-                      ],
+                      ),
                     ),
-                  ),
-                ],
+                  );
+                },
               ),
             ),
           ),
@@ -394,7 +410,7 @@ class _GameCard extends StatelessWidget {
           ],
         ),
         child: Container(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(22),
             gradient: LinearGradient(
@@ -412,90 +428,81 @@ class _GameCard extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              // Icon with glow effect
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  gradient: LinearGradient(
-                    colors: gradientColors,
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: gradientColors.first.withOpacity(0.6),
-                      blurRadius: 8,
-                      spreadRadius: 2,
+              Flexible(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        gradient: LinearGradient(colors: gradientColors),
+                        boxShadow: [
+                          BoxShadow(
+                            color: gradientColors.first.withOpacity(0.6),
+                            blurRadius: 8,
+                            spreadRadius: 2,
+                          ),
+                        ],
+                      ),
+                      child: Icon(iconData, size: 28, color: Colors.white),
+                    ),
+                    const SizedBox(height: 13),
+                    ShaderMask(
+                      shaderCallback: (bounds) => LinearGradient(
+                        colors: gradientColors,
+                      ).createShader(bounds),
+                      child: Text(
+                        title,
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w900,
+                          color: Colors.white,
+                          letterSpacing: 1.0,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      subtitle,
+                      style: TextStyle(
+                        fontSize: 13.3,
+                        fontWeight: FontWeight.w600,
+                        color: gradientColors.first.withOpacity(0.9),
+                        letterSpacing: 0.4,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 12),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 7,
+                      ),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(12),
+                        gradient: LinearGradient(colors: gradientColors),
+                        boxShadow: [
+                          BoxShadow(
+                            color: gradientColors.first.withOpacity(0.4),
+                            blurRadius: 6,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: const Text(
+                        "ENTER ⚡",
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.white,
+                          letterSpacing: 1.0,
+                        ),
+                      ),
                     ),
                   ],
-                ),
-                child: Icon(
-                  iconData,
-                  size: 32,
-                  color: Colors.white,
-                ),
-              ),
-
-              const SizedBox(height: 16),
-
-              // Title with gradient text
-              ShaderMask(
-                shaderCallback: (bounds) =>
-                    LinearGradient(
-                      colors: gradientColors,
-                    ).createShader(bounds),
-                child: Text(
-                  title,
-                  style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w900,
-                    color: Colors.white,
-                    letterSpacing: 1.0,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-              ),
-
-              const SizedBox(height: 8),
-
-              // Subtitle
-              Text(
-                subtitle,
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                  color: gradientColors.first.withOpacity(0.9),
-                  letterSpacing: 0.5,
-                ),
-                textAlign: TextAlign.center,
-              ),
-
-              const SizedBox(height: 16),
-
-              // Gaming-style "ENTER" button
-              Container(
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 16, vertical: 8),
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(12),
-                  gradient: LinearGradient(
-                    colors: gradientColors,
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: gradientColors.first.withOpacity(0.4),
-                      blurRadius: 6,
-                      offset: const Offset(0, 2),
-                    ),
-                  ],
-                ),
-                child: const Text(
-                  "ENTER ⚡",
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                    color: Colors.white,
-                    letterSpacing: 1.0,
-                  ),
                 ),
               ),
             ],

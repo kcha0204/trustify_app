@@ -5,3 +5,4 @@ pillow
 easyocr
 azure-ai-contentsafety
 azure-core
+python-multipart

@@ -26,7 +26,10 @@ class AzureContentSafetyProvider:
           }
         """
         try:
-            options = AnalyzeTextOptions(text=text)
+            options = AnalyzeTextOptions(
+                text=text,
+                output_type="FourSeverityLevels"
+            )
             resp = self.client.analyze_text(options)
             # The SDK returns a collection of category results with severity & confidence
             cats = {}
@@ -48,6 +51,13 @@ class AzureContentSafetyProvider:
             return {"categories": {}, "confidence_scores": {}, "risk_level": "Safe", "error": str(e)}
 
     def _severity_to_level(self, severity: int) -> str:
-        # 0=Safe, 1-2 Low, 3-4 Medium, 5-7 High (typical mapping; adjust if your account returns 0-6)
-        bands = ['Safe','Low','Low','Medium','Medium','High','High','High']
-        return bands[severity] if 0 <= severity < len(bands) else 'Unknown'
+        if severity == 0:
+            return 'Safe'
+        elif severity == 1:
+            return 'Low'
+        elif severity in (2, 3):
+            return 'Medium'
+        elif severity in (4, 5, 6, 7):
+            return 'High'
+        else:
+            return 'Unknown'
