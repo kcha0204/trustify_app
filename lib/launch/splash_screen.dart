@@ -1,9 +1,10 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
-import 'home_screen.dart';
 
 class SplashScreen extends StatefulWidget {
-  const SplashScreen({super.key});
+  final VoidCallback onComplete;
+
+  const SplashScreen({super.key, required this.onComplete});
 
   @override
   State<SplashScreen> createState() => _SplashScreenState();
@@ -21,9 +22,7 @@ class _SplashScreenState extends State<SplashScreen>
     super.initState();
     Future.delayed(const Duration(milliseconds: 4000), () {
       if (mounted) {
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (_) => const HomeScreen()),
-        );
+        widget.onComplete();
       }
     });
   }
