@@ -1,5 +1,6 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'content_detection_page.dart';
 import 'cyber_trends_page.dart';
 
@@ -59,117 +60,264 @@ class HomeScreen extends StatelessWidget {
     );
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      body: Stack(
-        fit: StackFit.expand,
-        children: [
-          // Blurred colorful background
-          _buildBlurredHomeBackground(),
-
-          // Main content
-          SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: LayoutBuilder(
-                builder: (context, constraints) {
-                  return SingleChildScrollView(
-                    child: ConstrainedBox(
-                      constraints: BoxConstraints(
-                        minHeight: constraints.maxHeight,
-                      ),
-                      child: IntrinsicHeight(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            // Cyber Warrior Welcome Message
-                            _CyberWarriorWelcome(),
-
-                            const SizedBox(height: 40),
-
-                            // Two main feature cards arranged side by side
-                            Expanded(
-                              child: Column(
-                                children: [
-                                  // First row of cards
-                                  Flexible(
-                                    child: Row(
-                                      children: [
-                                        // First Card: Harmful Content Detection
-                                        Expanded(
-                                          child: _GameCard(
-                                            title: "🛡️ SCAN & PROTECT",
-                                            subtitle: "AI-Powered Content Shield",
-                                            gradientColors: const [
-                                              Color(0xFF00FF88), // Neon Green
-                                              Color(0xFF00D4FF), // Cyber Blue
-                                            ],
-                                            iconData: Icons.security,
-                                            onTap: () {
-                                              Navigator.push(
-                                                context,
-                                                MaterialPageRoute(
-                                                  builder: (
-                                                      _) => const ContentDetectionPage(),
-                                                ),
-                                              );
-                                            },
-                                          ),
-                                        ),
-
-                                        const SizedBox(width: 12),
-
-                                        // Second Card: Cyber Trends Dashboard
-                                        Expanded(
-                                          child: _GameCard(
-                                            title: "📊 CYBER INTEL",
-                                            subtitle: "Victoria Threat Dashboard",
-                                            gradientColors: const [
-                                              Color(0xFFFF3366),
-                                              // Electric Pink
-                                              Color(0xFF9D4EDD),
-                                              // Gaming Purple
-                                            ],
-                                            iconData: Icons.analytics,
-                                            onTap: () {
-                                              Navigator.push(
-                                                context,
-                                                MaterialPageRoute(
-                                                  builder: (
-                                                      _) => const CyberTrendsPage(),
-                                                ),
-                                              );
-                                            },
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-
-                                  // Space for future cards (second row)
-                                  const SizedBox(height: 12),
-
-                                  // Placeholder for future cards
-                                  Flexible(
-                                    child: Container(
-                                      // This space is reserved for future cards
-                                      child: const SizedBox(),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
+  // Function to show exit confirmation dialog
+  Future<bool> _showExitConfirmationDialog(BuildContext context) async {
+    return await showDialog<bool>(
+          context: context,
+          barrierDismissible: false, // User must tap button to close
+          builder: (BuildContext context) {
+            return AlertDialog(
+              backgroundColor: const Color(0xFF1A1A1A),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20),
+                side: BorderSide(
+                  color: const Color(0xFF00FF88).withOpacity(0.3),
+                  width: 1,
+                ),
+              ),
+              title: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      gradient: const LinearGradient(
+                        colors: [Color(0xFF00FF88), Color(0xFF00D4FF)],
                       ),
                     ),
-                  );
-                },
+                    child: const Icon(
+                      Icons.exit_to_app,
+                      color: Colors.white,
+                      size: 20,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  const Text(
+                    'Exit Trustify?',
+                    style: TextStyle(
+                      color: Color(0xFF00FF88),
+                      fontWeight: FontWeight.bold,
+                      fontSize: 18,
+                    ),
+                  ),
+                ],
+              ),
+              content: const Text(
+                'Are you sure you want to exit the app? Your cyber protection mission will be paused.',
+                style: TextStyle(color: Colors.white70, fontSize: 16),
+              ),
+              actions: [
+                // No button
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(false),
+                  style: TextButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 20,
+                      vertical: 10,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      side: BorderSide(
+                        color: Colors.grey.withOpacity(0.3),
+                        width: 1,
+                      ),
+                    ),
+                  ),
+                  child: const Text(
+                    'Stay',
+                    style: TextStyle(
+                      color: Colors.white70,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                // Yes button
+                ElevatedButton(
+                  onPressed: () {
+                    Navigator.of(context).pop(true);
+                    // Close the app completely
+                    SystemNavigator.pop();
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFFFF3366),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 20,
+                      vertical: 10,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    elevation: 3,
+                  ),
+                  child: const Text(
+                    'Exit',
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ],
+            );
+          },
+        ) ??
+        false; // Return false if dialog is dismissed
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return WillPopScope(
+      onWillPop: () async {
+        return await _showExitConfirmationDialog(context);
+      },
+      child: Scaffold(
+        body: Stack(
+          fit: StackFit.expand,
+          children: [
+            // Blurred colorful background
+            _buildBlurredHomeBackground(),
+
+            // Main content
+            SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    return SingleChildScrollView(
+                      child: ConstrainedBox(
+                        constraints: BoxConstraints(
+                          minHeight: constraints.maxHeight,
+                        ),
+                        child: IntrinsicHeight(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              // Cyber Warrior Welcome Message
+                              _CyberWarriorWelcome(),
+
+                              const SizedBox(height: 40),
+
+                              // Two main feature cards arranged side by side
+                              Expanded(
+                                child: Column(
+                                  children: [
+                                    // First row of cards
+                                    Flexible(
+                                      child: Row(
+                                        children: [
+                                          // First Card: Harmful Content Detection
+                                          Expanded(
+                                            child: _GameCard(
+                                              title: "🛡️ SCAN & PROTECT",
+                                              subtitle:
+                                                  "AI-Powered Content Shield",
+                                              gradientColors: const [
+                                                Color(0xFF00FF88), // Neon Green
+                                                Color(0xFF00D4FF), // Cyber Blue
+                                              ],
+                                              iconData: Icons.security,
+                                              onTap: () {
+                                                Navigator.push(
+                                                  context,
+                                                  MaterialPageRoute(
+                                                    builder: (_) =>
+                                                        const ContentDetectionPage(),
+                                                  ),
+                                                );
+                                              },
+                                            ),
+                                          ),
+
+                                          const SizedBox(width: 12),
+
+                                          // Second Card: Cyber Trends Dashboard
+                                          Expanded(
+                                            child: _GameCard(
+                                              title: "📊 CYBER INTEL",
+                                              subtitle:
+                                                  "Victoria Threat Dashboard",
+                                              gradientColors: const [
+                                                Color(0xFFFF3366),
+                                                // Electric Pink
+                                                Color(0xFF9D4EDD),
+                                                // Gaming Purple
+                                              ],
+                                              iconData: Icons.analytics,
+                                              onTap: () {
+                                                Navigator.push(
+                                                  context,
+                                                  MaterialPageRoute(
+                                                    builder: (_) =>
+                                                        const CyberTrendsPage(),
+                                                  ),
+                                                );
+                                              },
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+
+                                    // Space for future cards (second row)
+                                    const SizedBox(height: 12),
+
+                                    // Placeholder for future cards
+                                    Flexible(
+                                      child: Container(
+                                        // This space is reserved for future cards
+                                        child: const SizedBox(),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                ),
               ),
             ),
-          ),
-        ],
+
+            // Small, subtle exit button in top-right corner
+            Positioned(
+              top: 20,
+              right: 20,
+              child: GestureDetector(
+                onTap: () async {
+                  final shouldExit = await _showExitConfirmationDialog(context);
+                  if (shouldExit) {
+                    SystemNavigator.pop();
+                  }
+                },
+                child: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(20),
+                    color: Colors.black.withOpacity(0.6),
+                    border: Border.all(
+                      color: Colors.white.withOpacity(0.3),
+                      width: 1,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.3),
+                        blurRadius: 4,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: const Icon(
+                    Icons.close,
+                    color: Colors.white70,
+                    size: 16,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

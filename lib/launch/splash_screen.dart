@@ -11,18 +11,43 @@ class SplashScreen extends StatefulWidget {
 
 class _SplashScreenState extends State<SplashScreen>
     with SingleTickerProviderStateMixin {
-  late final AnimationController _c =
-  AnimationController(
-      vsync: this, duration: const Duration(milliseconds: 1200))
-    ..forward();
+  late final AnimationController _c;
+  bool _navigated = false;
 
   @override
   void initState() {
     super.initState();
-    Future.delayed(const Duration(milliseconds: 4000), () {
-      if (mounted) {
+
+    // Initialize animation controller
+    _c = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1200),
+    );
+
+    // Start animation
+    _c.forward();
+
+    // Schedule navigation with clean state management
+    _scheduleNavigation();
+  }
+
+  void _scheduleNavigation() {
+    Future.delayed(const Duration(milliseconds: 3500), () {
+      if (mounted && !_navigated) {
+        _navigated = true;
         Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (_) => const HomeScreen()),
+          PageRouteBuilder(
+            pageBuilder: (context, animation,
+                secondaryAnimation) => const HomeScreen(),
+            transitionDuration: const Duration(milliseconds: 600),
+            transitionsBuilder: (context, animation, secondaryAnimation,
+                child) {
+              return FadeTransition(
+                opacity: animation,
+                child: child,
+              );
+            },
+          ),
         );
       }
     });
@@ -39,20 +64,30 @@ class _SplashScreenState extends State<SplashScreen>
     return Stack(
       fit: StackFit.expand,
       children: [
-        // Background image - colorful cyberbullying awareness image
+        // Use splash_bg.jpg directly since teen_cyberbullying_bg.jpg is corrupted
         Image.asset(
-          'assets/splash/teen_cyberbullying_bg.jpg',
+          'assets/splash/splash_bg.jpg',
           fit: BoxFit.cover,
           errorBuilder: (context, error, stackTrace) {
-            // Fallback to original background if new image is not found
-            return Image.asset(
-              'assets/splash/splash_bg.jpg',
-              fit: BoxFit.cover,
+            // Fallback to gradient background if image fails to load
+            return Container(
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    Color(0xFF1E3A8A), // Deep Blue
+                    Color(0xFFEC4899), // Hot Pink
+                    Color(0xFF10B981), // Emerald
+                    Color(0xFFF59E0B), // Amber
+                  ],
+                ),
+              ),
             );
           },
         ),
 
-        // Progressive blur effect with gradient overlay
+        // Progressive blur effect with gradient overlay - same intensity as home screen
         Positioned.fill(
           child: ClipRect(
             child: BackdropFilter(

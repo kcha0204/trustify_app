@@ -9,11 +9,105 @@ import io
 import logging
 import json
 
+# Import dashboard endpoints
+try:
+    from dashboard.api import dashboard_bp
+
+    DASHBOARD_AVAILABLE = True
+except ImportError:
+    DASHBOARD_AVAILABLE = False
+    logging.warning("Dashboard module not available - dashboard endpoints will not be registered")
+
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
 app = FastAPI(title="Trustify Analyzer - Complete Content Safety API", version="2.0.0")
+
+# Register dashboard endpoints if available
+if DASHBOARD_AVAILABLE:
+    # Note: FastAPI doesn't use Flask blueprints, so we'll add a router instead
+    from fastapi import APIRouter
+
+    dashboard_router = APIRouter(prefix="/dashboard", tags=["dashboard"])
+
+
+    @dashboard_router.get("/overview")
+    def get_dashboard_overview():
+        """Get dashboard overview data"""
+        try:
+            from dashboard.api import processor
+            overview_data = processor.get_cyber_trends_overview()
+            return {
+                "success": True,
+                "data": overview_data
+            }
+        except Exception as e:
+            logger.error(f"Dashboard overview error: {str(e)}")
+            return {
+                "success": False,
+                "error": str(e)
+            }
+
+
+    @dashboard_router.get("/charts")
+    def get_dashboard_charts():
+        """Get dashboard charts data"""
+        try:
+            from dashboard.api import processor
+            chart_data = processor.get_trend_charts_data()
+            return {
+                "success": True,
+                "data": chart_data
+            }
+        except Exception as e:
+            logger.error(f"Dashboard charts error: {str(e)}")
+            return {
+                "success": False,
+                "error": str(e)
+            }
+
+
+    @dashboard_router.get("/trends/{period}")
+    def get_trends_by_period(period: str):
+        """Get trends data by period"""
+        try:
+            trend_data = {
+                "period": period,
+                "data": [],
+                "message": "Endpoint ready - customize based on your Excel data structure"
+            }
+            return {
+                "success": True,
+                "data": trend_data
+            }
+        except Exception as e:
+            logger.error(f"Trends by period error: {str(e)}")
+            return {
+                "success": False,
+                "error": str(e)
+            }
+
+
+    @dashboard_router.get("/health")
+    def dashboard_health():
+        """Dashboard health check"""
+        try:
+            from dashboard.api import processor
+            return {
+                "status": "healthy",
+                "data_file_available": processor.data_file_path is not None,
+                "data_file_path": processor.data_file_path if processor.data_file_path else "Not found"
+            }
+        except Exception as e:
+            return {
+                "status": "error",
+                "error": str(e)
+            }
+
+
+    app.include_router(dashboard_router)
+    logger.info("✅ Dashboard endpoints registered successfully")
 
 # Initialize components
 try:

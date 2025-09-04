@@ -7,6 +7,9 @@ import sys
 import subprocess
 from pathlib import Path
 
+
+# Requires: AI server at ai_module/ai_api.py (on :8081), Uvicorn, Python 3.9+, dashboard_api.py in backend
+
 def check_env_file():
     """Check if .env file exists and has required variables"""
     env_path = Path(__file__).parent / '.env'
@@ -59,19 +62,28 @@ def main():
     
     print("✅ All checks passed!")
     print("🌐 Starting server on http://0.0.0.0:8080")
-    print("📱 Flutter app should use http://10.166.189.111:8080 for real device")
+    print("📱 Flutter app should use http://118.138.91.225:8080 for real device")
     print("📱 For Android emulator, use http://10.0.2.2:8080")
     print("="*50)
     
     # Start the server
     try:
-        subprocess.run([
-            sys.executable, "-m", "uvicorn", 
-            "server:app", 
-            "--host", "0.0.0.0", 
-            "--port", "8080",
-            "--reload"
-        ], check=True)
+        # Start AI FastAPI app
+        ai_server = subprocess.Popen(
+            [sys.executable, "-m", "uvicorn", "ai_module.ai_api:app", "--host", "0.0.0.0", "--port",
+             "8081"]
+        )
+        # Start dashboard API with Uvicorn
+        dash_server = subprocess.Popen(
+            [sys.executable, "-m", "uvicorn", "dashboard_api:app", "--host", "0.0.0.0", "--port",
+             "8080"]
+        )
+        try:
+            ai_server.wait()
+            dash_server.wait()
+        finally:
+            ai_server.terminate()
+            dash_server.terminate()
     except KeyboardInterrupt:
         print("\n👋 Server stopped by user")
     except subprocess.CalledProcessError as e:

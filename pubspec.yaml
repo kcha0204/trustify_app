@@ -38,8 +38,12 @@ dependencies:
   # Image picker for content detection functionality
   image_picker: ^1.0.7
   http: ^1.2.0
-  supabase_flutter: ^2.10.0
+  supabase_flutter: ^2.6.0
   google_fonts: ^6.1.0
+  uuid: ^4.3.3
+  flutter_dotenv: ^5.1.0
+  webview_flutter: ^4.4.2
+  fl_chart: ^0.66.2
 
 dev_dependencies:
   flutter_test:
@@ -78,8 +82,8 @@ flutter:
     - assets/icons/trustify_icon_circular.png
     - assets/icons/trustify_icon_circular_new.png
     - assets/splash/splash_bg.jpg
-    - assets/splash/teen_cyberbullying_bg.jpg
     - assets/splash/cyberbullying_social_bg.jpg
+    - .env
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images
 
