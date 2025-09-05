@@ -44,5 +44,7 @@ app.*.map.json
 /android/app/profile
 /android/app/release
 
-# Add .env to .gitignore
+# Ignore env/secret files
 .env
+**/.env
+*.env
