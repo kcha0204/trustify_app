@@ -4,6 +4,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import '../services/ai_detection_service.dart';
+import 'scenario_knowledge_selection_page.dart';
 
 const String kAnalyzerBaseUrl = 'https://oqjeucsmquvsitfqjsry.supabase.co/functions/v1';
 
@@ -24,6 +25,7 @@ class _ContentDetectionPageState extends State<ContentDetectionPage>
   AiDetectionResult? _detectionResult;
   bool _isAnalyzing = false;
   bool _showResults = false;
+  bool _resultDialogVisible = false;
   int _xp = 0;
   int _streak = 0;
 
@@ -233,6 +235,7 @@ class _ContentDetectionPageState extends State<ContentDetectionPage>
         } else {
           _streak += 1;
         }
+        _resultDialogVisible = true;
       });
       _autoHideResults();
     } catch (e) {
@@ -242,6 +245,7 @@ class _ContentDetectionPageState extends State<ContentDetectionPage>
         _showResults = true;
         _detectionResult = null;
         _streak = 0;
+        _resultDialogVisible = true;
       });
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -276,6 +280,7 @@ class _ContentDetectionPageState extends State<ContentDetectionPage>
         } else {
           _streak += 1;
         }
+        _resultDialogVisible = true;
       });
       _autoHideResults();
     } catch (e) {
@@ -285,6 +290,7 @@ class _ContentDetectionPageState extends State<ContentDetectionPage>
         _showResults = true;
         _detectionResult = null;
         _streak = 0;
+        _resultDialogVisible = true;
       });
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -307,6 +313,7 @@ class _ContentDetectionPageState extends State<ContentDetectionPage>
       _selectedImage = null;
       _detectionResult = null;
       _showResults = false;
+      _resultDialogVisible = false;
     });
   }
 
@@ -316,6 +323,7 @@ class _ContentDetectionPageState extends State<ContentDetectionPage>
       if (_detectionResult != null) {
         _detectionResult = null;
         _showResults = false;
+        _resultDialogVisible = false;
       }
     });
   }
@@ -326,6 +334,7 @@ class _ContentDetectionPageState extends State<ContentDetectionPage>
       if (_detectionResult != null) {
         _detectionResult = null;
         _showResults = false;
+        _resultDialogVisible = false;
       }
     });
   }
@@ -335,6 +344,7 @@ class _ContentDetectionPageState extends State<ContentDetectionPage>
       if (_showResults && mounted) {
         setState(() {
           _showResults = false;
+          _resultDialogVisible = false;
         });
       }
     });
@@ -342,6 +352,112 @@ class _ContentDetectionPageState extends State<ContentDetectionPage>
 
   @override
   Widget build(BuildContext context) {
+    final contentColumn = Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(
+              left: 8, right: 8, top: 10, bottom: 10),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              IconButton(
+                icon: const Icon(
+                    Icons.arrow_back, color: Colors.white, size: 28),
+                splashRadius: 28,
+                onPressed: () => Navigator.of(context).pop(),
+                tooltip: 'Back to Home',
+              ),
+              Expanded(
+                child: Container(
+                  margin: const EdgeInsets.only(left: 6, right: 0),
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withOpacity(0.85),
+                    borderRadius: BorderRadius.circular(15),
+                    border: Border.all(
+                      color: const Color(0xFF00FF88),
+                      width: 2,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFF00FF88).withOpacity(0.3),
+                        blurRadius: 16,
+                        spreadRadius: 1,
+                      ),
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.5),
+                        blurRadius: 14,
+                        offset: const Offset(0, 3),
+                      ),
+                    ],
+                  ),
+                  alignment: Alignment.center,
+                  child: ShaderMask(
+                    shaderCallback: (Rect bounds) =>
+                        const LinearGradient(
+                          colors: [
+                            Color(0xFF00FF88),
+                            Color(0xFF00D4FF),
+                            Color(0xFFFF3366),
+                          ],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ).createShader(bounds),
+                    child: const Text(
+                      'AI CONTENT SHIELD',
+                      overflow: TextOverflow.ellipsis,
+                      maxLines: 1,
+                      style: TextStyle(
+                        fontSize: 23,
+                        fontWeight: FontWeight.w900,
+                        color: Colors.white,
+                        letterSpacing: 1.2,
+                        shadows: [
+                          Shadow(
+                              blurRadius: 10,
+                              color: Colors.black54,
+                              offset: Offset(0, 2)),
+                        ],
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        Expanded(
+          child: Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  const SizedBox(height: 12),
+                  // Paste Text and Upload Image Cards
+                  _buildInputRow(context),
+                  const SizedBox(height: 20),
+                  _buildXPBar(),
+                  if (_isAnalyzing)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 22),
+                      child: _buildScanBar(),
+                    ),
+                  const SizedBox(height: 60),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+
+    if (_showResults && _resultDialogVisible) {
+      WidgetsBinding.instance.addPostFrameCallback((_) =>
+          _showResultPopup(context));
+    }
+
     return Scaffold(
       extendBodyBehindAppBar: true,
       backgroundColor: Colors.transparent,
@@ -353,113 +469,7 @@ class _ContentDetectionPageState extends State<ContentDetectionPage>
         fit: StackFit.expand,
         children: [
           _buildBlurredBackground(),
-          SafeArea(
-            child: Column(
-              children: [
-                Padding(
-                  padding: const EdgeInsets.only(
-                      left: 8, right: 8, top: 10, bottom: 10),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    children: [
-                      IconButton(
-                        icon: const Icon(
-                            Icons.arrow_back, color: Colors.white, size: 28),
-                        splashRadius: 28,
-                        onPressed: () => Navigator.of(context).pop(),
-                        tooltip: 'Back to Home',
-                      ),
-                      Expanded(
-                        child: Container(
-                          margin: const EdgeInsets.only(left: 6, right: 0),
-                          padding: const EdgeInsets.symmetric(vertical: 8),
-                          decoration: BoxDecoration(
-                            color: Colors.black.withOpacity(0.85),
-                            borderRadius: BorderRadius.circular(15),
-                            border: Border.all(
-                              color: const Color(0xFF00FF88),
-                              width: 2,
-                            ),
-                            boxShadow: [
-                              BoxShadow(
-                                color: const Color(0xFF00FF88).withOpacity(0.3),
-                                blurRadius: 16,
-                                spreadRadius: 1,
-                              ),
-                              BoxShadow(
-                                color: Colors.black.withOpacity(0.5),
-                                blurRadius: 14,
-                                offset: const Offset(0, 3),
-                              ),
-                            ],
-                          ),
-                          alignment: Alignment.center,
-                          child: ShaderMask(
-                            shaderCallback: (Rect bounds) =>
-                                const LinearGradient(
-                                  colors: [
-                                    Color(0xFF00FF88),
-                                    Color(0xFF00D4FF),
-                                    Color(0xFFFF3366),
-                                  ],
-                                  begin: Alignment.topLeft,
-                                  end: Alignment.bottomRight,
-                                ).createShader(bounds),
-                            child: const Text(
-                              'AI CONTENT SHIELD',
-                              overflow: TextOverflow.ellipsis,
-                              maxLines: 1,
-                              style: TextStyle(
-                                fontSize: 23,
-                                fontWeight: FontWeight.w900,
-                                color: Colors.white,
-                                letterSpacing: 1.2,
-                                shadows: [
-                                  Shadow(
-                                      blurRadius: 10,
-                                      color: Colors.black54,
-                                      offset: Offset(0, 2)),
-                                ],
-                              ),
-                              textAlign: TextAlign.center,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                Expanded(
-                  child: Padding(
-                    padding: const EdgeInsets.all(16.0),
-                    child: SingleChildScrollView(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          const SizedBox(height: 12),
-                          // Paste Text and Upload Image Cards
-                          _buildInputRow(context),
-                          const SizedBox(height: 20),
-                          _buildXPBar(),
-                          if (_isAnalyzing)
-                            Padding(
-                              padding: const EdgeInsets.only(top: 22),
-                              child: _buildScanBar(),
-                            ),
-                          if (_showResults)
-                            Padding(
-                              padding: const EdgeInsets.only(top: 22),
-                              child: _buildResultCard(),
-                            ),
-                          const SizedBox(height: 60),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
+          SafeArea(child: contentColumn),
         ],
       ),
     );
@@ -646,6 +656,7 @@ class _ContentDetectionPageState extends State<ContentDetectionPage>
                   _detectionResult != null) {
                 _detectionResult = null;
                 _showResults = false;
+                _resultDialogVisible = false;
               }
             });
           },
@@ -732,7 +743,7 @@ class _ContentDetectionPageState extends State<ContentDetectionPage>
                 ),
               ),
             ],
-                ),
+          ),
         ),
       ),
       colorA: const Color(0xFFFF3366),
@@ -783,70 +794,6 @@ class _ContentDetectionPageState extends State<ContentDetectionPage>
           ),
         ],
       ),
-    );
-  }
-
-  Widget _buildResultCard() {
-    final result = _detectionResult;
-    final isError = result == null;
-    List<Color> resultColors;
-    String emoji;
-    String title;
-    String subtitle;
-    String friendlyMessage = '';
-
-    if (isError) {
-      resultColors = [const Color(0xFFFFDD00), const Color(0xFF06FFA5)];
-      emoji = '⚠️';
-      title = 'ANALYSIS FAILED';
-      subtitle = 'Connection error - try again';
-      friendlyMessage = '';
-    } else {
-      // Use new model's user-friendly message for the headline
-      friendlyMessage = result.message;
-      // Color and icon based on the risk level
-      if (result.riskLevel == 'Very Harmful') {
-        resultColors = [Colors.red.shade700, Colors.red.shade900];
-        emoji = '🛑';
-        title = 'MAJOR HARMFUL CONTENT';
-        subtitle = result.composedSummary;
-      } else if (result.riskLevel == 'Harmful') {
-        resultColors = [Colors.orange.shade700, Colors.orange.shade900];
-        emoji = '⚠️';
-        title = 'HARMFUL CONTENT FOUND';
-        subtitle = result.composedSummary;
-      } else if (result.riskLevel == 'Warning') {
-        resultColors = [Colors.yellow.shade700, Colors.orange.shade400];
-        emoji = '🟡';
-        title = 'MILD RISK';
-        subtitle = result.composedSummary;
-      } else {
-        resultColors = [Colors.green.shade400, Colors.green.shade700];
-        emoji = '✅';
-        title = 'SAFE CONTENT';
-        subtitle = result.composedSummary;
-      }
-    }
-    return _buildInfoCard(
-      icon: isError ? Icons.error_outline : Icons.shield_rounded,
-      title: '$emoji $title',
-      subtitle: friendlyMessage,
-      // put teen message as headline
-      child: isError ? null :
-      Padding(
-        padding: const EdgeInsets.symmetric(vertical: 8.0),
-        child: Text(
-          subtitle.isNotEmpty ? subtitle : '',
-          style: TextStyle(
-            color: resultColors[0],
-            fontWeight: FontWeight.w500,
-            fontSize: 14,
-          ),
-          textAlign: TextAlign.center,
-        ),
-      ),
-      colorA: resultColors[0],
-      colorB: resultColors[1],
     );
   }
 
@@ -988,6 +935,246 @@ class _ContentDetectionPageState extends State<ContentDetectionPage>
             ),
         ],
       ),
+    );
+  }
+
+  void _showResultPopup(BuildContext context) async {
+    // Only show one dialog at a time
+    if (!_resultDialogVisible || !_showResults) return;
+    await showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) {
+        final result = _detectionResult;
+        final isError = result == null;
+        List<Color> resultColors;
+        String emoji;
+        String title;
+        String subtitle;
+        String friendlyMessage = '';
+        if (isError) {
+          resultColors = [const Color(0xFFFFDD00), const Color(0xFF06FFA5)];
+          emoji = '⚠️';
+          title = 'ANALYSIS FAILED';
+          subtitle = 'Connection error - try again';
+          friendlyMessage = '';
+        } else {
+          friendlyMessage = result.message;
+          if (result.riskLevel == 'Very Harmful') {
+            resultColors = [Colors.red.shade700, Colors.red.shade900];
+            emoji = '🛑';
+            title = 'MAJOR HARMFUL CONTENT';
+            subtitle = result.composedSummary;
+          } else if (result.riskLevel == 'Harmful') {
+            resultColors = [Colors.orange.shade700, Colors.orange.shade900];
+            emoji = '⚠️';
+            title = 'HARMFUL CONTENT FOUND';
+            subtitle = result.composedSummary;
+          } else if (result.riskLevel == 'Warning') {
+            resultColors = [Colors.yellow.shade700, Colors.orange.shade400];
+            emoji = '🟡';
+            title = 'MILD RISK';
+            subtitle = result.composedSummary;
+          } else {
+            resultColors = [Colors.green.shade400, Colors.green.shade700];
+            emoji = '✅';
+            title = 'SAFE CONTENT';
+            subtitle = result.composedSummary;
+          }
+        }
+        return Center(
+          child: Material(
+            color: Colors.transparent,
+            child: Container(
+              width: MediaQuery
+                  .of(context)
+                  .size
+                  .width * 0.91,
+              constraints: BoxConstraints(
+                maxWidth: 420,
+                minHeight: 360,
+                maxHeight: 490,
+              ),
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                color: Colors.black.withOpacity(0.96),
+                borderRadius: BorderRadius.circular(32),
+                boxShadow: [
+                  BoxShadow(
+                    color: resultColors[0].withOpacity(0.18),
+                    blurRadius: 40,
+                    spreadRadius: 8,
+                  ),
+                ],
+                border: Border.all(
+                  color: resultColors[0],
+                  width: 4,
+                ),
+              ),
+              child: Stack(
+                children: [
+                  // Close button (red X)
+                  Positioned(
+                    right: 0,
+                    top: 0,
+                    child: IconButton(
+                      icon: Icon(Icons.close, color: Colors.red[700], size: 26),
+                      splashRadius: 26,
+                      onPressed: () {
+                        setState(() {
+                          _resultDialogVisible = false;
+                          _showResults = false;
+                        });
+                        Navigator.of(ctx).pop();
+                      },
+                      tooltip: 'Close',
+                    ),
+                  ),
+                  // Content
+                  Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    mainAxisSize: MainAxisSize.max,
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      const SizedBox(height: 8),
+                      Container(
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          gradient: LinearGradient(colors: resultColors),
+                          boxShadow: [
+                            BoxShadow(
+                              color: resultColors[0].withOpacity(0.5),
+                              blurRadius: 10,
+                            ),
+                          ],
+                        ),
+                        child: Icon(
+                          isError ? Icons.error_outline : Icons.shield_rounded,
+                          color: Colors.white,
+                          size: 32,
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      ShaderMask(
+                        shaderCallback: (bounds) =>
+                            LinearGradient(colors: resultColors).createShader(
+                                bounds),
+                        child: Text('$emoji $title',
+                          style: const TextStyle(
+                            fontSize: 19,
+                            fontWeight: FontWeight.w800,
+                            color: Colors.white,
+                            letterSpacing: 1,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      Text(
+                        friendlyMessage,
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 15.5,
+                          fontWeight: FontWeight.w600,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                      if (!isError && subtitle.isNotEmpty)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 6.0),
+                          child: Text(
+                            subtitle,
+                            style: TextStyle(
+                              color: resultColors[0],
+                              fontSize: 13.5,
+                              fontWeight: FontWeight.w500,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                        ),
+                      const Spacer(),
+                      Text(
+                        'Want to learn more about cyberbullying or strengthen your skills? Try a quiz now:',
+                        style: TextStyle(
+                          color: Colors.white.withOpacity(0.9),
+                          fontWeight: FontWeight.w500,
+                          fontSize: 14.5,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.only(top: 17),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            ElevatedButton(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFFAB1FF5),
+                                foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(
+                                    vertical: 14),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(17),
+                                ),
+                                elevation: 3,
+                              ),
+                              onPressed: () {
+                                Navigator.of(ctx).pop();
+                                setState(() {
+                                  _resultDialogVisible = false;
+                                  _showResults = false;
+                                });
+                                Navigator.of(context).push(
+                                  MaterialPageRoute(builder: (
+                                      _) => const ScenarioKnowledgeSelectionPage()),
+                                );
+                              },
+                              child: const Text(
+                                'Scenario-based Quiz',
+                                style: TextStyle(
+                                    fontWeight: FontWeight.bold, fontSize: 19),
+                              ),
+                            ),
+                            const SizedBox(height: 14),
+                            ElevatedButton(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFF10B89E),
+                                foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(
+                                    vertical: 14),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(17),
+                                ),
+                                elevation: 3,
+                              ),
+                              onPressed: () {
+                                Navigator.of(ctx).pop();
+                                setState(() {
+                                  _resultDialogVisible = false;
+                                  _showResults = false;
+                                });
+                                Navigator.of(context).push(
+                                  MaterialPageRoute(builder: (
+                                      _) => const ScenarioKnowledgeSelectionPage()),
+                                );
+                              },
+                              child: const Text(
+                                'Knowledge-based Quiz',
+                                style: TextStyle(
+                                    fontWeight: FontWeight.bold, fontSize: 19),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 }

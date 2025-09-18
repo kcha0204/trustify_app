@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'content_detection_page.dart';
 import 'cyber_trends_page.dart';
+import 'scenario_knowledge_selection_page.dart'; // Import the ScenarioKnowledgeSelectionPage
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
@@ -200,71 +201,100 @@ class HomeScreen extends StatelessWidget {
                               Expanded(
                                 child: Column(
                                   children: [
-                                    // First row of cards
-                                    Flexible(
+                                    Expanded(
                                       child: Row(
                                         children: [
-                                          // First Card: Harmful Content Detection
                                           Expanded(
                                             child: _GameCard(
                                               title: "🛡️ SCAN & PROTECT",
-                                              subtitle:
-                                                  "AI-Powered Content Shield",
+                                              subtitle: "AI-Powered Content Shield",
                                               gradientColors: const [
-                                                Color(0xFF00FF88), // Neon Green
-                                                Color(0xFF00D4FF), // Cyber Blue
+                                                Color(0xFF00FF88),
+                                                Color(0xFF00D4FF),
                                               ],
                                               iconData: Icons.security,
                                               onTap: () {
                                                 Navigator.push(
                                                   context,
                                                   MaterialPageRoute(
-                                                    builder: (_) =>
-                                                        const ContentDetectionPage(),
+                                                    builder: (
+                                                        _) => const ContentDetectionPage(),
                                                   ),
                                                 );
                                               },
                                             ),
                                           ),
-
                                           const SizedBox(width: 12),
-
-                                          // Second Card: Cyber Trends Dashboard
                                           Expanded(
                                             child: _GameCard(
                                               title: "📊 CYBER INTEL",
-                                              subtitle:
-                                                  "Victoria Threat Dashboard",
+                                              subtitle: "Victoria Threat Dashboard",
                                               gradientColors: const [
                                                 Color(0xFFFF3366),
-                                                // Electric Pink
                                                 Color(0xFF9D4EDD),
-                                                // Gaming Purple
                                               ],
                                               iconData: Icons.analytics,
                                               onTap: () {
                                                 Navigator.push(
                                                   context,
                                                   MaterialPageRoute(
-                                                    builder: (_) =>
-                                                        const CyberTrendsPage(),
+                                                    builder: (
+                                                        _) => const CyberTrendsPage(),
+                                                  ),
+                                                );
+                                              },
+                                            ),
+                                          )
+                                        ],
+                                      ),
+                                    ),
+                                    const SizedBox(height: 12),
+                                    Expanded(
+                                      child: Row(
+                                        children: [
+                                          Expanded(
+                                            child: _GameCard(
+                                              title: "🎯 WISE SWIPE",
+                                              subtitle: "Interactive Cyberbullying Quiz Hub",
+                                              gradientColors: const [
+                                                Color(0xFFFFDD00),
+                                                Color(0xFFF59E0B),
+                                              ],
+                                              iconData: Icons.question_answer,
+                                              onTap: () {
+                                                Navigator.push(
+                                                  context,
+                                                  MaterialPageRoute(
+                                                    builder: (
+                                                        _) => const ScenarioKnowledgeSelectionPage(),
                                                   ),
                                                 );
                                               },
                                             ),
                                           ),
+                                          const SizedBox(width: 12),
+                                          Expanded(
+                                            child: _GameCard(
+                                              title: "🤖 CYBER GURU",
+                                              subtitle: "Conversational AI Mentor with Explainer Videos",
+                                              gradientColors: const [
+                                                Color(0xFF1877F2),
+                                                Color(0xFF1877F2),
+                                              ],
+                                              iconData: Icons.smart_toy,
+                                              onTap: () {
+                                                ScaffoldMessenger
+                                                    .of(context)
+                                                    .showSnackBar(
+                                                  const SnackBar(
+                                                    content: Text(
+                                                        'Cyber Guru chatbot is coming soon!'),
+                                                  ),
+                                                );
+                                              },
+                                            ),
+                                          )
                                         ],
-                                      ),
-                                    ),
-
-                                    // Space for future cards (second row)
-                                    const SizedBox(height: 12),
-
-                                    // Placeholder for future cards
-                                    Flexible(
-                                      child: Container(
-                                        // This space is reserved for future cards
-                                        child: const SizedBox(),
                                       ),
                                     ),
                                   ],
@@ -618,7 +648,7 @@ class _GameCard extends StatelessWidget {
                       style: TextStyle(
                         fontSize: 13.3,
                         fontWeight: FontWeight.w600,
-                        color: gradientColors.first.withOpacity(0.9),
+                        color: gradientColors.first,
                         letterSpacing: 0.4,
                       ),
                       textAlign: TextAlign.center,
@@ -640,7 +670,7 @@ class _GameCard extends StatelessWidget {
                           ),
                         ],
                       ),
-                      child: const Text(
+                      child: Text(
                         "ENTER ⚡",
                         style: TextStyle(
                           fontSize: 12,

@@ -83,6 +83,11 @@ flutter:
     - assets/icons/trustify_icon_circular_new.png
     - assets/splash/splash_bg.jpg
     - assets/splash/cyberbullying_social_bg.jpg
+    - assets/aftersplash/after_splash_bg.jpeg
+    - assets/aftersplash/Page 1.jpeg
+    - assets/aftersplash/Page 2.jpeg
+    - assets/aftersplash/Page 3.jpeg
+    - assets/aftersplash/Page 4.jpeg
     - .env
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images
