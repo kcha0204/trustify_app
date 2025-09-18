@@ -1,6 +1,6 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
-import 'home_screen.dart';
+import 'intro_screens.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -38,7 +38,7 @@ class _SplashScreenState extends State<SplashScreen>
         Navigator.of(context).pushReplacement(
           PageRouteBuilder(
             pageBuilder: (context, animation,
-                secondaryAnimation) => const HomeScreen(),
+                secondaryAnimation) => const IntroScreensPageView(),
             transitionDuration: const Duration(milliseconds: 600),
             transitionsBuilder: (context, animation, secondaryAnimation,
                 child) {
