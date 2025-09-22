@@ -1,9 +1,10 @@
 import 'dart:ui';
 import 'dart:math';
 import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:audioplayers/audioplayers.dart';
+import '../services/vcams_api.dart';
 
 class VcamsRow {
   final String state;
@@ -40,109 +41,144 @@ class CyberTrendsPage extends StatefulWidget {
   State<CyberTrendsPage> createState() => _CyberTrendsPageState();
 }
 
-class _CyberTrendsPageState extends State<CyberTrendsPage> {
-  late final SupabaseClient sb;
+class _CyberTrendsPageState extends State<CyberTrendsPage>
+    with TickerProviderStateMixin {
+  final AudioPlayer _audioPlayer = AudioPlayer();
+  late AnimationController _sparkleController;
+  final VcamsApi _api = VcamsApi();
 
-  String? indicator;
-  String? subtype;
-  bool asPercent = true;
-  final Set<String> selectedValues = {}; // Subdivision values
-  final Set<int> selectedYears = {}; // e.g., {2014,2016,2018}
+  // State variables
+  List<String> _indicators = [];
+  List<String> _subdivisionTypes = [];
+  List<String> _subdivisionValues = [];
+  List<int> _years = [2014, 2016, 2018];
+
+  String _selectedIndicator = 'Cyber bullying';
+  String _selectedSubdivisionType = 'Year level';
+  List<String> _selectedSubdivisionValues = [];
+  List<int> _selectedYears = [2018];
+
+  List<SeriesData> _kpiSeriesData = [];
+  List<SeriesData> _trendData = [];
+  List<VcamsData> _breakdownData = [];
+
+  bool _isLoading = true;
+  String? _errorMessage;
 
   @override
   void initState() {
     super.initState();
-    // Make sure .env is loaded in main.dart and re-use keys
-    final url = dotenv.env['SUPABASE_URL'] ?? '';
-    final key = dotenv.env['SUPABASE_ANON_KEY'] ?? '';
-    sb = SupabaseClient(url, key);
+    _sparkleController = AnimationController(
+        duration: const Duration(milliseconds: 3200), vsync: this)
+      ..repeat();
+    _initializeData();
   }
 
-  Future<List<String>> _distinct(String column) async {
-    final res = await sb.from('vcams_long').select(column).limit(1000);
-    final list = (res as List)
-        .map((e) => (e[column] ?? '').toString())
-        .where((s) => s.isNotEmpty)
-        .toSet()
-        .toList()
-      ..sort();
-    return list;
+  @override
+  void dispose() {
+    _sparkleController.dispose();
+    _audioPlayer.dispose();
+    super.dispose();
   }
 
-  Future<List<String>> _subtypesForIndicator(String ind) async {
-    final res = await sb
-        .from('vcams_long')
-        .select('subdivision_type')
-        .eq('indicator', ind)
-        .limit(1000);
-    final list = (res as List)
-        .map((e) => e['subdivision_type'].toString())
-        .where((s) => s.isNotEmpty)
-        .toSet()
-        .toList()
-      ..sort();
-    return list;
-  }
+  Future<void> _initializeData() async {
+    try {
+      setState(() {
+        _isLoading = true;
+        _errorMessage = null;
+      });
 
-  List<String> _naturalYearSort(List<String> vals) {
-    int tail(String s) {
-      final m = RegExp(r'(\d+)').firstMatch(s);
-      return m != null ? int.parse(m.group(1)!) : 1 << 30;
+      // Load indicators first
+      final indicators = await _api.getIndicators();
+      setState(() {
+        _indicators = indicators;
+        if (_indicators.isNotEmpty &&
+            !_indicators.contains(_selectedIndicator)) {
+          _selectedIndicator = _indicators.first;
+        }
+      });
+
+      // Load subdivision types for the selected indicator
+      await _loadSubdivisionTypes();
+      await _loadData();
+    } catch (e) {
+      setState(() {
+        _errorMessage = 'Failed to load dashboard data: $e';
+        _isLoading = false;
+      });
     }
-    vals.sort((a, b) => tail(a).compareTo(tail(b)));
-    return vals;
   }
 
-  Future<List<String>> _valuesFor(String ind, String stype) async {
-    final res = await sb
-        .from('vcams_long')
-        .select('subdivision_value')
-        .eq('indicator', ind)
-        .eq('subdivision_type', stype)
-        .limit(5000);
-    final list = (res as List).map((e) => e['subdivision_value'].toString())
-        .where((s) => s.isNotEmpty)
-        .toSet()
-        .toList();
-    if (stype == 'Year level') return _naturalYearSort(list);
-    list.sort();
-    return list;
+  Future<void> _loadSubdivisionTypes() async {
+    try {
+      final types = await _api.getSubdivisionTypes(_selectedIndicator);
+      setState(() {
+        _subdivisionTypes = types;
+        if (_subdivisionTypes.isNotEmpty &&
+            !_subdivisionTypes.contains(_selectedSubdivisionType)) {
+          _selectedSubdivisionType = _subdivisionTypes.first;
+        }
+      });
+      await _loadSubdivisionValues();
+    } catch (e) {
+      print('Error loading subdivision types: $e');
+    }
   }
 
-  Future<List<int>> _yearsFor(String ind, {required String stype}) async {
-    final res = await sb
-        .from('vcams_long')
-        .select('year')
-        .eq('indicator', ind)
-        .eq('subdivision_type', stype)
-        .limit(100);
-    final ys = (res as List)
-        .map((e) => int.parse(e['year'].toString()))
-        .toSet()
-        .toList()
-      ..sort();
-    return ys;
+  Future<void> _loadSubdivisionValues() async {
+    try {
+      final values = await _api.getSubdivisionValues(
+          _selectedIndicator, _selectedSubdivisionType);
+      setState(() {
+        _subdivisionValues = values;
+        _selectedSubdivisionValues = []; // Reset selection
+      });
+    } catch (e) {
+      print('Error loading subdivision values: $e');
+    }
   }
 
-  Future<List<VcamsRow>> _fetchData({
-    required String ind,
-    required String stype,
-    required List<String> subvals,
-    required List<int> years,
-  }) async {
-    final q = sb
-        .from('vcams_long')
-        .select('state,indicator,subdivision_type,subdivision_value,year,value')
-        .eq('indicator', ind)
-        .eq('subdivision_type', stype)
-        .inFilter('subdivision_value', subvals)
-        .inFilter('year', years)
-        .order('year', ascending: true)
-        .limit(5000);
-    final res = await q;
-    return (res as List)
-        .map((e) => VcamsRow.fromJson(e as Map<String, dynamic>))
-        .toList();
+  Future<void> _loadData() async {
+    try {
+      setState(() {
+        _isLoading = true;
+      });
+
+      // Load KPI series data
+      final kpiSeries = await _api.getSeriesData(
+        _selectedIndicator,
+        _selectedSubdivisionType,
+        values: _selectedSubdivisionValues.isEmpty
+            ? null
+            : _selectedSubdivisionValues,
+      );
+
+      // Load trend data (always statewide)
+      final trendData = await _api.getStatewideTrend(_selectedIndicator);
+
+      // Load breakdown data for the latest selected year
+      final latestYear = _selectedYears.isEmpty ? 2018 : _selectedYears.last;
+      final breakdownData = await _api.getBreakdownData(
+        _selectedIndicator,
+        _selectedSubdivisionType,
+        latestYear,
+        values: _selectedSubdivisionValues.isEmpty
+            ? null
+            : _selectedSubdivisionValues,
+      );
+
+      setState(() {
+        _kpiSeriesData = kpiSeries;
+        _trendData = trendData;
+        _breakdownData = breakdownData;
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() {
+        _errorMessage = 'Error loading data: $e';
+        _isLoading = false;
+      });
+    }
   }
 
   Widget _buildBlurredBackground() {
@@ -150,42 +186,195 @@ class _CyberTrendsPageState extends State<CyberTrendsPage> {
       fit: StackFit.expand,
       children: [
         Image.asset(
-          'assets/splash/cyberbullying_social_bg.jpg',
+          'assets/aftersplash/after_splash_bg.jpeg',
           fit: BoxFit.cover,
-          errorBuilder: (context, error, stackTrace) {
-            return Container(
-              decoration: const BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [
-                    Color(0xFF1E3A8A),
-                    Color(0xFFEC4899),
-                    Color(0xFF10B981),
-                    Color(0xFFFF3366),
-                  ],
-                ),
-              ),
-            );
-          },
         ),
         Positioned.fill(
           child: ClipRect(
             child: BackdropFilter(
-              filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
+              filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
               child: Container(
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
                     begin: Alignment.topCenter,
                     end: Alignment.bottomCenter,
                     colors: [
-                      Colors.black.withOpacity(0.2),
-                      Colors.black.withOpacity(0.4),
-                      Colors.black.withOpacity(0.6),
+                      Colors.black.withOpacity(0.22),
+                      Colors.black.withOpacity(0.39),
+                      Colors.black.withOpacity(0.63),
                     ],
                   ),
                 ),
               ),
+            ),
+          ),
+        ),
+        SparkleOverlayContent(sparkleController: _sparkleController)
+      ],
+    );
+  }
+
+  Widget _buildDropdowns() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      margin: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.black.withOpacity(0.8),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: const Color(0xFF10B981), width: 2),
+      ),
+      child: Column(
+        children: [
+          // Indicator dropdown
+          _buildDropdown(
+            'Indicator',
+            _selectedIndicator,
+            _indicators,
+                (value) async {
+              setState(() {
+                _selectedIndicator = value!;
+              });
+              await _loadSubdivisionTypes();
+              await _loadData();
+            },
+          ),
+          const SizedBox(height: 12),
+
+          // Subdivision Type dropdown
+          _buildDropdown(
+            'Subdivision Type',
+            _selectedSubdivisionType,
+            _subdivisionTypes,
+                (value) async {
+              setState(() {
+                _selectedSubdivisionType = value!;
+              });
+              await _loadSubdivisionValues();
+              await _loadData();
+            },
+          ),
+          const SizedBox(height: 12),
+
+          // Subdivision Values multi-select
+          if (_subdivisionValues.isNotEmpty) ...[
+            Text(
+              'Subdivision Values (optional)',
+              style: TextStyle(
+                color: const Color(0xFF10B981),
+                fontWeight: FontWeight.w600,
+                fontSize: 14,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              children: _subdivisionValues.map((value) {
+                final isSelected = _selectedSubdivisionValues.contains(value);
+                return FilterChip(
+                  label: Text(value),
+                  selected: isSelected,
+                  onSelected: (selected) async {
+                    setState(() {
+                      if (selected) {
+                        _selectedSubdivisionValues.add(value);
+                      } else {
+                        _selectedSubdivisionValues.remove(value);
+                      }
+                    });
+                    await _loadData();
+                  },
+                  selectedColor: const Color(0xFF10B981),
+                  checkmarkColor: Colors.white,
+                  labelStyle: TextStyle(
+                    color: isSelected ? Colors.white : const Color(0xFF10B981),
+                    fontWeight: FontWeight.w500,
+                  ),
+                );
+              }).toList(),
+            ),
+            const SizedBox(height: 12),
+          ],
+
+          // Year selection
+          Text(
+            'Years',
+            style: TextStyle(
+              color: const Color(0xFF10B981),
+              fontWeight: FontWeight.w600,
+              fontSize: 14,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            children: _years.map((year) {
+              final isSelected = _selectedYears.contains(year);
+              return FilterChip(
+                label: Text(year.toString()),
+                selected: isSelected,
+                onSelected: (selected) async {
+                  setState(() {
+                    if (selected) {
+                      _selectedYears.add(year);
+                    } else {
+                      _selectedYears.remove(year);
+                    }
+                  });
+                  await _loadData();
+                },
+                selectedColor: const Color(0xFF176CB8),
+                checkmarkColor: Colors.white,
+                labelStyle: TextStyle(
+                  color: isSelected ? Colors.white : const Color(0xFF176CB8),
+                  fontWeight: FontWeight.w500,
+                ),
+              );
+            }).toList(),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDropdown(String label, String value, List<String> items,
+      ValueChanged<String?> onChanged) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: TextStyle(
+            color: const Color(0xFF10B981),
+            fontWeight: FontWeight.w600,
+            fontSize: 14,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          decoration: BoxDecoration(
+            color: Colors.black.withOpacity(0.3),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: const Color(0xFF10B981).withOpacity(0.3)),
+          ),
+          child: DropdownButtonHideUnderline(
+            child: DropdownButton<String>(
+              value: value,
+              isExpanded: true,
+              dropdownColor: Colors.black.withOpacity(0.9),
+              style: const TextStyle(color: Colors.white),
+              items: items.map((String item) {
+                return DropdownMenuItem<String>(
+                  value: item,
+                  child: Text(
+                    item,
+                    style: const TextStyle(color: Colors.white, fontSize: 13),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                );
+              }).toList(),
+              onChanged: onChanged,
             ),
           ),
         ),
@@ -193,553 +382,827 @@ class _CyberTrendsPageState extends State<CyberTrendsPage> {
     );
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return FutureBuilder(
-      future: Future.wait([
-        _distinct('indicator'),
-        _yearsFor(indicator ?? '', stype: subtype ?? ''),
-      ]),
-      builder: (context, snap) {
-        if (!snap.hasData) {
-          return Scaffold(
-            body: Stack(
-              children: [
-                _buildBlurredBackground(),
-                const Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      CircularProgressIndicator(color: Color(0xFF00FF88)),
-                      SizedBox(height: 16),
-                      Text('Loading Victorian Cyber Data...',
-                          style: TextStyle(color: Colors.white, fontSize: 16)),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          );
-        }
-        final indicators = (snap.data![0] as List<String>);
-        final years = (snap.data![1] as List<int>);
-        indicator ??= indicators.isNotEmpty ? indicators.first : null;
+  Widget _buildTrendAnalysisBox() {
+    if (_trendData.isEmpty) return SizedBox.shrink();
+    final indicator = _selectedIndicator;
+    final yearList = _selectedYears.isEmpty ? [2018] : _selectedYears;
+    final yearsText = yearList.length == 1
+        ? 'the year ${yearList.first}'
+        : 'the years ${yearList.join(", ")}';
+    final subdivisionType = _selectedSubdivisionType;
+    final valuesSelected = _selectedSubdivisionValues;
+    String filterText = '';
+    if (subdivisionType == 'All of state' || valuesSelected.isEmpty) {
+      filterText = '';
+    } else {
+      final groupLabel = valuesSelected.length == 1
+          ? valuesSelected[0].toLowerCase()
+          : valuesSelected.take(3).map((v) => v.toLowerCase()).join(", ") +
+          (valuesSelected.length > 3 ? ', ...' : '');
+      filterText = 'of the $groupLabel population ';
+    }
+    double avg = 0;
+    List<double> values = [];
+    for (var y in yearList) {
+      final found = _trendData.where((e) => e.year == y).toList();
+      if (found.isNotEmpty) values.add(found.first.value);
+    }
+    if (values.isNotEmpty) {
+      avg = values.reduce((a, b) => a + b) / values.length;
+    }
+    final percentText = avg > 0 ? '${(avg * 100).toStringAsFixed(1)}%' : '';
+    final indicatorSimple = indicator == 'Electronic media >= 2'
+        ? 'spent 2+ hours daily on electronic media'
+        : indicator.toLowerCase();
 
-        return Scaffold(
-          extendBodyBehindAppBar: true,
-          backgroundColor: Colors.transparent,
-          body: Stack(
-            fit: StackFit.expand,
+    String message = '';
+    if (indicator == 'Electronic media >= 2') {
+      message =
+      "Hey! $percentText $filterText used mobile devices or social media for 2+ hours a day in $yearsText.";
+    } else if (indicator.toLowerCase().contains('bullying') &&
+        indicator != 'Cyber bullying') {
+      message =
+      "Remember, $percentText $filterText experienced ${indicatorSimple
+          .replaceAll('bullying', 'bullying (all types)')} in $yearsText.";
+    } else if (indicator == 'Cyber bullying') {
+      message =
+      "Heads up! $percentText $filterText experienced cyberbullying in $yearsText.";
+    } else {
+      message =
+      'Heads up! About $percentText $filterText were $indicatorSimple$filterText in $yearsText.';
+    }
+
+    if (valuesSelected.length > 1) {
+      message = message.replaceAll('population', 'groups');
+    }
+
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+      decoration: BoxDecoration(
+        color: const Color(0xFF283463).withOpacity(0.86),
+        border: Border.all(
+            color: const Color(0xFF10B981).withOpacity(0.43), width: 1.5),
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF10B981).withOpacity(0.18),
+            blurRadius: 18,
+          )
+        ],
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Icon(Icons.info, color: const Color(0xFF10B981), size: 22),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              message,
+              style: const TextStyle(
+                fontSize: 13.4,
+                fontWeight: FontWeight.w700,
+                color: Colors.white,
+              ),
+              maxLines: 6,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBreakdownAnalysisBox() {
+    if (_breakdownData.isEmpty) return SizedBox.shrink();
+    final indicator = _selectedIndicator;
+    final year = _selectedYears.isEmpty ? 2018 : _selectedYears.last;
+    final subdivisionType = _selectedSubdivisionType;
+    String groupSummary = '';
+    if (_subdivisionValues.isNotEmpty &&
+        _selectedSubdivisionValues.isNotEmpty) {
+      groupSummary = ' for ${_selectedSubdivisionValues.take(3).join(
+          ", ")}${_selectedSubdivisionValues.length > 3 ? ', ...' : ''}';
+    }
+    String message = "Here's how different groups compare for $indicator in $year.";
+    if (_breakdownData.isNotEmpty) {
+      final top = _breakdownData.first;
+      final bot = _breakdownData.last;
+      final topName = top.subdivisionValue;
+      final botName = bot.subdivisionValue;
+      final topPct = (top.value * 100).toStringAsFixed(1);
+      final botPct = (bot.value * 100).toStringAsFixed(1);
+      message =
+      "In $year, $topName had the highest rate of ${indicator
+          .toLowerCase()} ($topPct%) while $botName had the lowest ($botPct%)$groupSummary.";
+      if (_breakdownData.length == 1) {
+        message =
+        "Breakdown for $indicator$groupSummary in $year: $topName was at $topPct%.";
+      } else if (top.value > 0.3) {
+        message =
+        "Alert: In $year, $topName stood out in ${indicator
+            .toLowerCase()} ($topPct%)$groupSummary.";
+      } else if (bot.value < 0.10) {
+        message =
+        "Good job! In $year, only $botPct% of $botName were affected by ${indicator
+            .toLowerCase()}$groupSummary.";
+      }
+    }
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+      decoration: BoxDecoration(
+        color: const Color(0xFF302a49).withOpacity(0.91),
+        border: Border.all(
+            color: const Color(0xFFF3B11E).withOpacity(0.3), width: 1.2),
+        borderRadius: BorderRadius.circular(14),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFFF3B11E).withOpacity(0.09),
+            blurRadius: 10,
+          )
+        ],
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Icon(Icons.monitor_heart, color: const Color(0xFFF3B11E), size: 20),
+          const SizedBox(width: 7),
+          Expanded(
+            child: Text(
+              message,
+              style: const TextStyle(
+                fontSize: 13.2,
+                color: Colors.white,
+                fontWeight: FontWeight.w700,
+              ),
+              maxLines: 6,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTrendAxisLabelBox() {
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 6),
+      decoration: BoxDecoration(
+        color: const Color(0xFF20363e).withOpacity(0.85),
+        border: Border.all(color: const Color(0xFF10B981).withOpacity(0.25)),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.label_important, color: Color(0xFF10B981), size: 17),
+          const SizedBox(width: 7),
+          Expanded(
+            child: Text(
+              'X: Year          Y: Proportion of Young People (%)',
+              style: const TextStyle(color: Colors.white,
+                  fontSize: 11.5,
+                  fontWeight: FontWeight.bold),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBreakdownLegendBox() {
+    if (_breakdownData.isEmpty) return SizedBox.shrink();
+    bool isPie = _breakdownData.length <= 5;
+    final type = _selectedSubdivisionType;
+    // match colours to bar/pie for legend
+    final List<Color> pieColors = [
+      const Color(0xFF10B981),
+      const Color(0xFF176CB8),
+      const Color(0xFFF3B11E),
+      const Color(0xFFE18616),
+      const Color(0xFF8B5CF6),
+    ];
+    final barGradient = [const Color(0xFFF3B11E), const Color(0xFFE18616)];
+
+    // Compose legend items
+    List<Widget> legendItems = [];
+    for (int i = 0; i < _breakdownData.length; i++) {
+      final group = _breakdownData[i].subdivisionValue;
+      Color color;
+      if (isPie) {
+        color = pieColors[i % pieColors.length];
+      } else {
+        // Use mid of vertical gradient for bar color display
+        color = Color.lerp(barGradient[0], barGradient[1], 0.6)!;
+      }
+      legendItems.add(Padding(
+        padding: const EdgeInsets.only(right: 13, bottom: 5),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 16,
+              height: 16,
+              decoration: BoxDecoration(
+                color: color,
+                borderRadius: BorderRadius.circular(4),
+                border: Border.all(color: Colors.white24, width: 1),
+              ),
+            ),
+            const SizedBox(width: 5),
+            Text(
+              group,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 11.7,
+                fontWeight: FontWeight.w600,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ],
+        ),
+      ));
+    }
+
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 7),
+      decoration: BoxDecoration(
+        color: const Color(0xFF41365d).withOpacity(0.82),
+        border: Border.all(color: const Color(0xFFF3B11E).withOpacity(0.22)),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Row(
+          children: legendItems,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTrendChart() {
+    if (_trendData.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    return Column(
+      children: [
+        Container(
+          margin: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+          padding: const EdgeInsets.all(16),
+          height: 250,
+          decoration: BoxDecoration(
+            color: Colors.black.withOpacity(0.8),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: const Color(0xFF10B981), width: 2),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _buildBlurredBackground(),
-              SafeArea(
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 16, vertical: 10),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Header
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.center,
-                        children: [
-                          IconButton(
-                            icon: const Icon(
-                                Icons.arrow_back, color: Colors.white,
-                                size: 28),
-                            onPressed: () => Navigator.of(context).pop(),
-                          ),
-                          Expanded(
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(vertical: 12),
-                              decoration: BoxDecoration(
-                                color: Colors.black.withOpacity(0.85),
-                                borderRadius: BorderRadius.circular(15),
-                                border: Border.all(
-                                    color: const Color(0xFF00FF88), width: 2),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: const Color(0xFF00FF88).withOpacity(
-                                        0.3),
-                                    blurRadius: 16,
-                                    spreadRadius: 1,
-                                  ),
-                                ],
-                              ),
-                              alignment: Alignment.center,
-                              child: ShaderMask(
-                                shaderCallback: (bounds) =>
-                                    const LinearGradient(
-                                      colors: [
-                                        Color(0xFF00FF88),
-                                        Color(0xFF00D4FF),
-                                        Color(0xFFFF3366),
-                                        Color(0xFFFFDD00)
-                                      ],
-                                    ).createShader(bounds),
-                                child: const Text(
-                                  'VICTORIA CYBER INTEL',
-                                  style: TextStyle(
-                                    fontSize: 20,
-                                    fontWeight: FontWeight.w900,
-                                    color: Colors.white,
-                                    letterSpacing: 1.2,
-                                  ),
-                                  textAlign: TextAlign.center,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 18),
-                      // Settings
-                      Row(
-                        children: [
-                          const Text('Indicator:', style: TextStyle(
-                              color: Colors.white)),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 8),
-                              decoration: BoxDecoration(
-                                color: Colors.grey.withOpacity(0.2),
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: DropdownButton<String>(
-                                value: indicator,
-                                dropdownColor: Colors.grey[800],
-                                style: const TextStyle(color: Colors.white),
-                                underline: Container(),
-                                isExpanded: true,
-                                items: indicators.map((e) =>
-                                    DropdownMenuItem(
-                                      value: e,
-                                      child: Text(e,
-                                          style: const TextStyle(fontSize: 12)),
-                                    )).toList(),
-                                onChanged: (v) =>
-                                    setState(() {
-                                      indicator = v;
-                                      subtype = null;
-                                      selectedValues.clear();
-                                      selectedYears.clear();
-                                    }),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 16),
-                          Row(
-                            children: [
-                              const Text('Percent',
-                                  style: TextStyle(color: Colors.white)),
-                              Switch(
-                                  value: asPercent,
-                                  activeColor: const Color(0xFF00FF88),
-                                  onChanged: (v) =>
-                                      setState(() => asPercent = v)
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 16),
-                      if (indicator != null)
-                        FutureBuilder(
-                          future: _subtypesForIndicator(indicator!),
-                          builder: (context, s2) {
-                            if (!s2.hasData) {
-                              return const Center(
-                                  child: CircularProgressIndicator(
-                                      color: Color(0xFF00FF88))
-                              );
-                            }
-                            final subtypes = s2.data as List<String>;
-                            subtype ??=
-                            subtypes.isNotEmpty ? subtypes.first : null;
-                            return Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(
-                                  children: [
-                                    const Text('Type:',
-                                        style: TextStyle(color: Colors.white)),
-                                    const SizedBox(width: 8),
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(
-                                          horizontal: 8),
-                                      decoration: BoxDecoration(
-                                        color: Colors.grey.withOpacity(0.2),
-                                        borderRadius: BorderRadius.circular(8),
-                                      ),
-                                      child: DropdownButton<String>(
-                                        value: subtype,
-                                        dropdownColor: Colors.grey[800],
-                                        style: const TextStyle(
-                                            color: Colors.white),
-                                        underline: Container(),
-                                        items: subtypes.map((e) =>
-                                            DropdownMenuItem(
-                                              value: e,
-                                              child: Text(e),
-                                            )).toList(),
-                                        onChanged: (v) {
-                                          setState(() {
-                                            subtype = v;
-                                            selectedValues.clear();
-                                            selectedYears.clear();
-                                          });
-                                        },
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 18),
-                                if (subtype != null)
-                                  FutureBuilder(
-                                    future: _valuesFor(indicator!, subtype!),
-                                    builder: (context, s3) {
-                                      if (!s3.hasData) {
-                                        return const SizedBox(height: 80,
-                                            child: Center(
-                                                child: CircularProgressIndicator()));
-                                      }
-                                      final vals = s3.data as List<String>;
-                                      if (selectedValues.isEmpty &&
-                                          vals.isNotEmpty) {
-                                        selectedValues.addAll(vals.take(5));
-                                      }
-                                      return Column(
-                                        crossAxisAlignment: CrossAxisAlignment
-                                            .start,
-                                        children: [
-                                          const Text('Values:',
-                                              style: TextStyle(
-                                                  color: Colors.white)),
-                                          const SizedBox(height: 10),
-                                          Scrollbar(
-                                            thumbVisibility: true,
-                                            child: SizedBox(
-                                              height: min(190, 36.0 *
-                                                  (vals.length / 2).ceil() +
-                                                  20),
-                                              child: SingleChildScrollView(
-                                                child: Wrap(
-                                                  spacing: 8,
-                                                  runSpacing: 10,
-                                                  children: vals.map((v) {
-                                                    final on = selectedValues
-                                                        .contains(v);
-                                                    return FilterChip(
-                                                      label: Text(
-                                                          v, style: TextStyle(
-                                                        color: on
-                                                            ? Colors.black
-                                                            : Colors.white,
-                                                        fontSize: 13,
-                                                      )),
-                                                      selected: on,
-                                                      selectedColor: const Color(
-                                                          0xFF00FF88),
-                                                      backgroundColor: Colors
-                                                          .grey.withOpacity(
-                                                          0.3),
-                                                      onSelected: (_) =>
-                                                          setState(() {
-                                                            on
-                                                                ? selectedValues
-                                                                .remove(v)
-                                                                : selectedValues
-                                                                .add(v);
-                                                          }),
-                                                    );
-                                                  }).toList(),
-                                                ),
-                                              ),
-                                            ),
-                                          ),
-                                          const SizedBox(height: 18),
-                                          const Text('Years:', style: TextStyle(
-                                              color: Colors.white)),
-                                          const SizedBox(height: 8),
-                                          FutureBuilder(
-                                            future: _yearsFor(
-                                                indicator!, stype: subtype!),
-                                            builder: (context, sYears) {
-                                              if (!sYears.hasData) {
-                                                return const SizedBox(
-                                                    height: 40,
-                                                    child: Center(
-                                                        child:
-                                                        CircularProgressIndicator()));
-                                              }
-                                              final years = sYears.data as List<
-                                                  int>;
-                                              if (selectedYears.isEmpty &&
-                                                  years.isNotEmpty) {
-                                                selectedYears.addAll(years);
-                                              }
-                                              selectedYears.removeWhere((
-                                                  y) => !years.contains(y));
-                                              return Column(
-                                                crossAxisAlignment: CrossAxisAlignment
-                                                    .start,
-                                                children: [
-                                                  Wrap(
-                                                    spacing: 6,
-                                                    children: years.map((y) {
-                                                      final on = selectedYears
-                                                          .contains(y);
-                                                      return FilterChip(
-                                                        label: Text('$y'),
-                                                        selected: on,
-                                                        onSelected: (_) =>
-                                                            setState(() {
-                                                              if (selectedYears
-                                                                  .length ==
-                                                                  1 && on)
-                                                                return; // at least one year
-                                                              on
-                                                                  ? selectedYears
-                                                                  .remove(y)
-                                                                  : selectedYears
-                                                                  .add(y);
-                                                            }),
-                                                      );
-                                                    }).toList(),
-                                                  ),
-                                                  const SizedBox(height: 12),
-                                                  _ChartsBlock(
-                                                    sb: sb,
-                                                    indicator: indicator!,
-                                                    subtype: subtype!,
-                                                    selectedValues: selectedValues
-                                                        .toList(),
-                                                    yearsForPlot: selectedYears
-                                                        .isEmpty
-                                                        ? years
-                                                        : selectedYears
-                                                        .toList(),
-                                                    asPercent: asPercent,
-                                                  ),
-                                                ],
-                                              );
-                                            },
-                                          ),
-                                        ],
-                                      );
-                                    },
-                                  ),
-                              ],
+              const SizedBox(height: 16),
+              const Text(
+                'Statewide Trend',
+                style: TextStyle(
+                  color: Color(0xFF10B981),
+                  fontWeight: FontWeight.w700,
+                  fontSize: 16,
+                ),
+              ),
+              const SizedBox(height: 16),
+              Expanded(
+                child: LineChart(
+                  LineChartData(
+                    gridData: FlGridData(show: false),
+                    titlesData: FlTitlesData(
+                      bottomTitles: AxisTitles(
+                        sideTitles: SideTitles(
+                          showTitles: true,
+                          reservedSize: 30,
+                          getTitlesWidget: (value, meta) {
+                            return Text(
+                              value.toInt().toString(),
+                              style: const TextStyle(
+                                  color: Colors.white, fontSize: 10),
                             );
                           },
                         ),
-                      const SizedBox(height: 12),
-                      SizedBox(
-                        height: MediaQuery
-                            .of(context)
-                            .size
-                            .height * 0.65,
-                        child: (indicator == null || subtype == null ||
-                            selectedValues.isEmpty)
-                            ? const Center(child: Text(
-                            'Select indicator, type, and at least one value.',
-                            style: TextStyle(color: Colors.white70)))
-                            : const SizedBox.shrink(),
                       ),
-                      const SizedBox(height: 48),
+                      leftTitles: AxisTitles(
+                        sideTitles: SideTitles(
+                          showTitles: true,
+                          reservedSize: 50,
+                          getTitlesWidget: (value, meta) {
+                            return Text(
+                              '${(value * 100).toInt()}%',
+                              style: const TextStyle(
+                                  color: Colors.white, fontSize: 10),
+                            );
+                          },
+                        ),
+                      ),
+                      topTitles: const AxisTitles(
+                          sideTitles: SideTitles(showTitles: false)),
+                      rightTitles: const AxisTitles(
+                          sideTitles: SideTitles(showTitles: false)),
+                    ),
+                    borderData: FlBorderData(show: false),
+                    lineBarsData: [
+                      LineChartBarData(
+                        spots: _trendData
+                            .map((data) =>
+                            FlSpot(data.year.toDouble(), data.value))
+                            .toList(),
+                        isCurved: true,
+                        gradient: const LinearGradient(
+                          colors: [Color(0xFF10B981), Color(0xFF176CB8)],
+                        ),
+                        barWidth: 3,
+                        dotData: FlDotData(
+                          show: true,
+                          getDotPainter: (spot, percent, barData, index) {
+                            return FlDotCirclePainter(
+                              radius: 4,
+                              color: _selectedYears.contains(spot.x.toInt())
+                                  ? const Color(0xFFF3B11E)
+                                  : const Color(0xFF10B981),
+                              strokeWidth: 2,
+                              strokeColor: Colors.white,
+                            );
+                          },
+                        ),
+                        belowBarData: BarAreaData(
+                          show: true,
+                          gradient: LinearGradient(
+                            colors: [
+                              const Color(0xFF10B981).withOpacity(0.3),
+                              const Color(0xFF176CB8).withOpacity(0.1),
+                            ],
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                          ),
+                        ),
+                      ),
                     ],
                   ),
                 ),
               ),
             ],
           ),
-        );
-      },
+        ),
+        _buildTrendAxisLabelBox(),
+        _buildTrendAnalysisBox(),
+      ],
     );
   }
-}
 
-class _ChartsBlock extends StatelessWidget {
-  const _ChartsBlock({
-    required this.sb,
-    required this.indicator,
-    required this.subtype,
-    required this.selectedValues,
-    required this.yearsForPlot,
-    required this.asPercent,
-  });
+  Widget _buildBreakdownChart() {
+    if (_breakdownData.isEmpty) {
+      return const SizedBox.shrink();
+    }
 
-  final SupabaseClient sb;
-  final String indicator;
-  final String subtype;
-  final List<String> selectedValues;
-  final List<int> yearsForPlot;
-  final bool asPercent;
+    // Compute dynamic height based on label/text length and bar count
+    final int barCount = _breakdownData.length;
+    // If there are long subdivision values, bump up height
+    final bool hasLongLabels = _breakdownData.any(
+          (d) => d.subdivisionValue.length > 14,
+    );
+    final double chartHeight = barCount > 12
+        ? 420
+        : hasLongLabels
+        ? 390
+        : 320;
 
-  Future<List<VcamsRow>> _fetch(
-      {required List<String> subvals, required List<int> years}) async {
-    final q = sb
-        .from('vcams_long')
-        .select('state,indicator,subdivision_type,subdivision_value,year,value')
-        .eq('indicator', indicator)
-        .eq('subdivision_type', subtype)
-        .inFilter('subdivision_value', subvals)
-        .inFilter('year', years)
-        .order('year', ascending: true)
-        .limit(5000);
-    final res = await q;
-    return (res as List)
-        .map((e) => VcamsRow.fromJson(e as Map<String, dynamic>))
-        .toList();
+    return Column(
+      children: [
+        Container(
+          margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          padding: const EdgeInsets.all(16),
+          height: chartHeight,
+          decoration: BoxDecoration(
+            color: Colors.black.withOpacity(0.8),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: const Color(0xFF176CB8), width: 2),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const SizedBox(height: 16),
+              Text(
+                'Breakdown (${_selectedYears.isEmpty ? 2018 : _selectedYears
+                    .last})',
+                style: const TextStyle(
+                  color: Color(0xFF176CB8),
+                  fontWeight: FontWeight.w700,
+                  fontSize: 16,
+                ),
+              ),
+              const SizedBox(height: 16),
+              Expanded(
+                child: _breakdownData.length <= 5
+                    ? _buildPieChart()
+                    : BarChart(
+                  BarChartData(
+                    alignment: BarChartAlignment.spaceAround,
+                    maxY: _breakdownData.map((d) => d.value).reduce(max) * 1.2,
+                    gridData: FlGridData(show: false),
+                    titlesData: FlTitlesData(
+                      bottomTitles: AxisTitles(
+                        sideTitles: SideTitles(
+                          showTitles: true,
+                          reservedSize: hasLongLabels ? 50 : 40,
+                          getTitlesWidget: (value, meta) {
+                            // Slant if labels are long or too many bars
+                            if (value.toInt() < _breakdownData.length) {
+                              return Transform.rotate(
+                                angle: -0.7, // ~ -40deg
+                                child: SizedBox(
+                                  width: hasLongLabels ? 54 : 40,
+                                  child: Text(
+                                    _breakdownData[value.toInt()]
+                                        .subdivisionValue,
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 9,
+                                    ),
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                    textAlign: TextAlign.left,
+                                  ),
+                                ),
+                              );
+                            }
+                            return const Text('');
+                          },
+                        ),
+                      ),
+                      leftTitles: AxisTitles(
+                        sideTitles: SideTitles(
+                          showTitles: true,
+                          reservedSize: 50,
+                          getTitlesWidget: (value, meta) {
+                            return Text(
+                              '${(value * 100).toInt()}%',
+                              style: const TextStyle(
+                                  color: Colors.orangeAccent, fontSize: 10),
+                            );
+                          },
+                        ),
+                      ),
+                      topTitles: const AxisTitles(
+                          sideTitles: SideTitles(showTitles: false)),
+                      rightTitles: const AxisTitles(
+                          sideTitles: SideTitles(showTitles: false)),
+                    ),
+                    borderData: FlBorderData(show: false),
+                    barGroups: _breakdownData
+                        .asMap()
+                        .entries
+                        .map((entry) {
+                      return BarChartGroupData(
+                        x: entry.key,
+                        barRods: [
+                          BarChartRodData(
+                            toY: entry.value.value,
+                            gradient: const LinearGradient(
+                              colors: [Color(0xFFF3B11E), Color(0xFFE18616)],
+                              begin: Alignment.bottomCenter,
+                              end: Alignment.topCenter,
+                            ),
+                            width: 16,
+                            borderRadius: const BorderRadius.only(
+                              topLeft: Radius.circular(4),
+                              topRight: Radius.circular(4),
+                            ),
+                          ),
+                        ],
+                      );
+                    }).toList(),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        _buildBreakdownLegendBox(),
+        _buildBreakdownAnalysisBox(),
+      ],
+    );
+  }
+
+  Widget _buildPieChart() {
+    final colors = [
+      const Color(0xFF10B981),
+      const Color(0xFF176CB8),
+      const Color(0xFFF3B11E),
+      const Color(0xFFE18616),
+      const Color(0xFF8B5CF6),
+    ];
+
+    return PieChart(
+      PieChartData(
+        sections: _breakdownData
+            .asMap()
+            .entries
+            .map((entry) {
+          final index = entry.key;
+          final data = entry.value;
+          return PieChartSectionData(
+            color: colors[index % colors.length],
+            value: data.value,
+            title: '${(data.value * 100).toStringAsFixed(1)}%',
+            radius: 80,
+            titleStyle: const TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.bold,
+              color: Colors.white,
+            ),
+          );
+        }).toList(),
+        centerSpaceRadius: 40,
+        sectionsSpace: 2,
+      ),
+    );
+  }
+
+  Widget _buildLoadingWidget() {
+    return Center(
+      child: Container(
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: Colors.black.withOpacity(0.8),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: const Color(0xFF10B981), width: 2),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const CircularProgressIndicator(
+              valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF10B981)),
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              'Loading Dashboard Data...',
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildErrorWidget() {
+    return Center(
+      child: Container(
+        margin: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: Colors.red.withOpacity(0.1),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: Colors.red, width: 2),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.error, color: Colors.red, size: 48),
+            const SizedBox(height: 16),
+            Text(
+              _errorMessage ?? 'An error occurred',
+              style: const TextStyle(color: Colors.white),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 16),
+            ElevatedButton(
+              onPressed: _initializeData,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF10B981),
+              ),
+              child: const Text('Retry'),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    if (selectedValues.isEmpty || yearsForPlot.isEmpty) {
-      return const SizedBox.shrink();
-    }
-    return FutureBuilder(
-      future: _fetch(subvals: selectedValues, years: yearsForPlot),
-      builder: (context, s4) {
-        if (!s4.hasData) {
-          return const Center(child: CircularProgressIndicator());
-        }
-        final rows = s4.data as List<VcamsRow>;
-        if (rows.isEmpty) {
-          return const Center(child: Text('No data for selection'));
-        }
-        final bySub = <String, List<VcamsRow>>{};
-        for (final r in rows) {
-          (bySub[r.subval] ??= []).add(r);
-        }
-        final xYears = yearsForPlot;
-        final minYear = xYears.first.toDouble();
-        final maxYear = xYears.last.toDouble();
-        final series = bySub.entries.map((e) {
-          final pts = e.value..sort((a, b) => a.year.compareTo(b.year));
-          return LineChartBarData(
-            isCurved: false,
-            barWidth: 2,
-            dotData: FlDotData(show: true),
-            spots: pts.map((r) {
-              final y = asPercent ? r.value * 100.0 : r.value;
-              return FlSpot(r.year.toDouble(), y);
-            }).toList(),
-          );
-        }).toList();
-        final latestY = xYears.last;
-        final latestRows = rows.where((r) => r.year == latestY).toList()
-          ..sort((a, b) => a.value.compareTo(b.value));
-        final barY = latestRows.map((r) =>
-        asPercent ? r.value * 100.0 : r.value).toList();
-        final barCats = latestRows.map((r) => r.subval).toList();
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Trend over years', style: TextStyle(fontSize: 20,
-                color: Colors.white,
-                fontWeight: FontWeight.bold)),
-            const SizedBox(height: 10),
-            SizedBox(
-              height: 260,
-              child: LineChart(LineChartData(
-                minY: 0,
-                minX: minYear,
-                maxX: maxYear,
-                gridData: FlGridData(show: true),
-                titlesData: FlTitlesData(
-                  bottomTitles: AxisTitles(
-                    sideTitles: SideTitles(
-                      showTitles: true,
-                      interval: 2,
-                      getTitlesWidget: (v, _) =>
-                          Text(v.toInt().toString(), style: TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold)),
-                    ),
+    return Scaffold(
+      extendBodyBehindAppBar: true,
+      backgroundColor: Colors.transparent,
+      appBar: PreferredSize(preferredSize: Size.zero, child: Container()),
+      body: Stack(
+        fit: StackFit.expand,
+        children: [
+          _buildBlurredBackground(),
+          SafeArea(
+            child: Column(
+              children: [
+                // Header with back button
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(0, 18, 0, 0),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.only(left: 9, top: 7),
+                        child: IconButton(
+                          icon: const Icon(
+                            Icons.arrow_back_ios_new_rounded,
+                            color: Color(0xFF127C82),
+                            size: 27,
+                          ),
+                          splashRadius: 26,
+                          onPressed: () {
+                            _audioPlayer.play(AssetSource('sounds/tap.wav'));
+                            Navigator.of(context).pop();
+                          },
+                          tooltip: 'Back',
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(
+                            minWidth: 1,
+                            minHeight: 1,
+                          ),
+                        ),
+                      ),
+                      Expanded(
+                        child: Container(
+                          margin: const EdgeInsets.fromLTRB(0, 12, 16, 0),
+                          padding: const EdgeInsets.symmetric(
+                            vertical: 16,
+                            horizontal: 20,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.black.withOpacity(0.75),
+                            border: Border.all(
+                              color: const Color(0xFF10B981),
+                              width: 3,
+                            ),
+                            borderRadius: BorderRadius.circular(24),
+                            boxShadow: [
+                              BoxShadow(
+                                color: const Color(0xFF10B981).withOpacity(0.5),
+                                blurRadius: 28,
+                                spreadRadius: 3,
+                              ),
+                            ],
+                          ),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              ShaderMask(
+                                shaderCallback: (Rect bounds) =>
+                                    const LinearGradient(
+                                  colors: [
+                                    Color(0xFF10B981),
+                                    Color(0xFF176CB8),
+                                  ],
+                                  begin: Alignment.centerLeft,
+                                  end: Alignment.centerRight,
+                                ).createShader(bounds),
+                                child: const Text(
+                                  "STAY AHEAD OF THE GAME",
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.w900,
+                                    fontSize: 22.5,
+                                    color: Colors.white,
+                                    letterSpacing: 1,
+                                    height: 1.2,
+                                    shadows: [
+                                      Shadow(
+                                        color: Color(0xFF10B981),
+                                        blurRadius: 12,
+                                      ),
+                                    ],
+                                  ),
+                                  textAlign: TextAlign.center,
+                                  maxLines: 2,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              ShaderMask(
+                                shaderCallback: (Rect bounds) =>
+                                    const LinearGradient(
+                                      colors: [
+                                        Color(0xFF176CB8),
+                                        Color(0xFF10B981),
+                                      ],
+                                      begin: Alignment.centerLeft,
+                                      end: Alignment.centerRight,
+                                    ).createShader(bounds),
+                                child: const Text(
+                                  "Know the Trends, Dodge the Drama! 🛡️✨",
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.w800,
+                                    fontSize: 15,
+                                    color: Colors.white,
+                                    letterSpacing: 0.65,
+                                    shadows: [
+                                      Shadow(
+                                        color: Color(0xFF176CB8),
+                                        blurRadius: 10,
+                                      ),
+                                    ],
+                                  ),
+                                  textAlign: TextAlign.center,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
-                  leftTitles: AxisTitles(
-                    sideTitles: SideTitles(
-                      showTitles: true,
-                      reservedSize: 38,
-                      getTitlesWidget: (v, _) =>
-                          Text(v.toStringAsFixed(1),
-                              style: TextStyle(color: Colors.white)),
-                    ),
-                  ),
-                  rightTitles: AxisTitles(
-                    sideTitles: SideTitles(
-                      showTitles: false,
-                      reservedSize: 38,
-                      getTitlesWidget: (v, _) =>
-                      const Text('', style: TextStyle(color: Colors.white)),
-                    ),
-                  ),
-                  topTitles: AxisTitles(
-                    sideTitles: SideTitles(
-                      showTitles: false,
-                      reservedSize: 38,
-                      getTitlesWidget: (v, _) =>
-                      const Text('', style: TextStyle(color: Colors.white)),
+                ),
+
+                // Main content
+                Expanded(
+                  child: _isLoading
+                      ? _buildLoadingWidget()
+                      : _errorMessage != null
+                      ? _buildErrorWidget()
+                      : SingleChildScrollView(
+                    padding: const EdgeInsets.only(bottom: 20),
+                    child: Column(
+                      children: [
+                        _buildDropdowns(),
+                        _buildTrendChart(),
+                        const SizedBox(height: 16),
+                        _buildBreakdownChart(),
+                      ],
                     ),
                   ),
                 ),
-                lineBarsData: series,
-              )),
-            ),
-            const SizedBox(height: 16),
-            Text('Current Situation ($latestY)', style: TextStyle(fontSize: 20,
-                color: Colors.white,
-                fontWeight: FontWeight.bold)),
-            const SizedBox(height: 10),
-            SizedBox(
-              height: max(200, 24.0 * barCats.length),
-              child: BarChart(BarChartData(
-                barGroups: [
-                  for (int i = 0; i < barCats.length; i++)
-                    BarChartGroupData(
-                        x: i, barRods: [BarChartRodData(toY: barY[i])]),
-                ],
-                titlesData: FlTitlesData(
-                  bottomTitles: AxisTitles(
-                    sideTitles: SideTitles(
-                      showTitles: false,
-                      reservedSize: 38,
-                      getTitlesWidget: (v, _) =>
-                      const Text('', style: TextStyle(color: Colors.white)),
-                    ),
-                  ),
-                  leftTitles: AxisTitles(
-                    sideTitles: SideTitles(
-                      showTitles: true,
-                      reservedSize: 38,
-                      getTitlesWidget: (v, _) =>
-                          Text(v.toStringAsFixed(1),
-                              style: TextStyle(color: Colors.white)),
-                    ),
-                  ),
-                  rightTitles: AxisTitles(
-                    sideTitles: SideTitles(
-                      showTitles: false,
-                      reservedSize: 38,
-                      getTitlesWidget: (v, _) =>
-                      const Text('', style: TextStyle(color: Colors.white)),
-                    ),
-                  ),
-                  topTitles: AxisTitles(
-                    sideTitles: SideTitles(
-                      showTitles: false,
-                      reservedSize: 38,
-                      getTitlesWidget: (v, _) =>
-                      const Text('', style: TextStyle(color: Colors.white)),
+                Align(
+                  alignment: Alignment.bottomCenter,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 18, vertical: 8),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                      ],
                     ),
                   ),
                 ),
-              )),
+              ],
             ),
-          ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class SparkleOverlayContent extends StatelessWidget {
+  final AnimationController sparkleController;
+
+  const SparkleOverlayContent({Key? key, required this.sparkleController})
+      : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    final sparkleAnimation = Tween<double>(begin: 0, end: 1).animate(
+        CurvedAnimation(parent: sparkleController, curve: Curves.linear));
+    return AnimatedBuilder(
+      animation: sparkleAnimation,
+      builder: (context, _) {
+        return Stack(
+          children: List.generate(15, (index) {
+            final offset = (sparkleAnimation.value * 2 * 3.14159 +
+                index * 0.4) % (2 * 3.14159);
+            final screenH = MediaQuery
+                .of(context)
+                .size
+                .height;
+            return Positioned(
+              left: 50 + (index % 5) * 70.0 + 20 * sin(offset),
+              top: ((sparkleAnimation.value + index * 0.07) % 1.0) *
+                  (screenH - 40) + 15,
+              child: Container(
+                width: 4,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: [
+                    const Color(0xFF176CB8),
+                    const Color(0xFF127C82),
+                    const Color(0xFFF3B11E),
+                    const Color(0xFFE18616),
+                  ][index % 4].withOpacity(0.67 + 0.18 * sin(offset)),
+                  shape: BoxShape.circle,
+                ),
+              ),
+            );
+          }),
         );
       },
     );

@@ -1,12 +1,26 @@
+import 'dart:math';
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:audioplayers/audioplayers.dart'; // Import audioplayers package
+import '../main.dart'; // Import for route observer access
 import 'content_detection_page.dart';
 import 'cyber_trends_page.dart';
 import 'scenario_knowledge_selection_page.dart'; // Import the ScenarioKnowledgeSelectionPage
+import 'ask_ally_chatbot_page.dart'; // Add missing import for AskAllyChatbotPage
 
-class HomeScreen extends StatelessWidget {
+class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
+
+  @override
+  State<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen>
+    with TickerProviderStateMixin, WidgetsBindingObserver, RouteAware {
+  final AudioPlayer _audioPlayer = AudioPlayer(); // Initialize AudioPlayer
+  late AnimationController _animationController;
+  late AnimationController _sparkleController; // Add sparkle controller
 
   // Function to create blurred background for home screen
   Widget _buildBlurredHomeBackground() {
@@ -15,7 +29,7 @@ class HomeScreen extends StatelessWidget {
       children: [
         // Background image - social media cyberbullying scene
         Image.asset(
-          'assets/splash/cyberbullying_social_bg.jpg',
+          'assets/aftersplash/after_splash_bg.jpeg',
           fit: BoxFit.cover,
           errorBuilder: (context, error, stackTrace) {
             // Final fallback gradient background if image is not found
@@ -26,7 +40,6 @@ class HomeScreen extends StatelessWidget {
                   end: Alignment.bottomRight,
                   colors: [
                     Color(0xFF1E3A8A), // Deep Blue
-                    Color(0xFFEC4899), // Hot Pink
                     Color(0xFF10B981), // Emerald
                     Color(0xFFF59E0B), // Amber
                   ],
@@ -40,7 +53,7 @@ class HomeScreen extends StatelessWidget {
         Positioned.fill(
           child: ClipRect(
             child: BackdropFilter(
-              filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
+              filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
               child: Container(
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
@@ -141,7 +154,7 @@ class HomeScreen extends StatelessWidget {
                     SystemNavigator.pop();
                   },
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFFFF3366),
+                    backgroundColor: const Color(0xFF10B981),
                     foregroundColor: Colors.white,
                     padding: const EdgeInsets.symmetric(
                       horizontal: 20,
@@ -164,6 +177,117 @@ class HomeScreen extends StatelessWidget {
         false; // Return false if dialog is dismissed
   }
 
+  void _playStartJingle() async {
+    await _audioPlayer.stop();
+    await _audioPlayer.setReleaseMode(ReleaseMode.stop);
+    await _audioPlayer.setVolume(1.0); // Loud for jingle
+    await _audioPlayer.play(AssetSource('sounds/start_jingle.mp3'));
+    // Loop background sound with lower volume after ~2.7s (approx jingle length)
+    Future.delayed(const Duration(milliseconds: 2700), () async {
+      if (mounted) {
+        _startBackgroundMusic();
+      }
+    });
+  }
+
+  // Function to start/resume background music
+  void _startBackgroundMusic() async {
+    try {
+      await _audioPlayer.stop();
+      await _audioPlayer.setVolume(0.33);
+      await _audioPlayer.setReleaseMode(ReleaseMode.loop);
+      await _audioPlayer.play(AssetSource('sounds/game_idle.mp3'));
+    } catch (e) {
+      print('Error playing background music: $e');
+    }
+  }
+
+  // Function to stop background music
+  void _stopBackgroundMusic() async {
+    try {
+      await _audioPlayer.stop();
+    } catch (e) {
+      print('Error stopping background music: $e');
+    }
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+
+    _animationController = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 10),
+    )
+      ..repeat();
+
+    // Add sparkle controller for intro-style particles
+    _sparkleController = AnimationController(
+      duration: const Duration(milliseconds: 3000),
+      vsync: this,
+    )
+      ..repeat();
+
+    // Start background music immediately when home screen loads
+    _startBackgroundMusic();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final route = ModalRoute.of(context);
+    if (route is PageRoute) {
+      routeObserver.subscribe(this, route as PageRoute);
+    }
+  }
+
+  @override
+  void dispose() {
+    routeObserver.unsubscribe(this);
+    WidgetsBinding.instance.removeObserver(this);
+    _animationController.dispose();
+    _sparkleController.dispose(); // Dispose sparkle controller
+    _stopBackgroundMusic();
+    super.dispose();
+  }
+
+  @override
+  void didPush() {
+    // Called when this route is pushed onto the navigator
+    // Start music when home screen appears
+    _startBackgroundMusic();
+  }
+
+  @override
+  void didPopNext() {
+    // Called when a route that was pushed on top of this route is popped
+    // This means we're coming back to the home screen
+    _startBackgroundMusic();
+  }
+
+  // Handle app lifecycle changes
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed && mounted) {
+      // Resume background music when app comes back to foreground
+      _startBackgroundMusic();
+    } else if (state == AppLifecycleState.paused) {
+      // Stop music when app goes to background
+      _stopBackgroundMusic();
+    }
+  }
+
+  @override
+  void didPushNext() {
+    _stopBackgroundMusic();
+  }
+
+  @override
+  void didPop() {
+    _startBackgroundMusic();
+  }
+
   @override
   Widget build(BuildContext context) {
     return WillPopScope(
@@ -176,7 +300,8 @@ class HomeScreen extends StatelessWidget {
           children: [
             // Blurred colorful background
             _buildBlurredHomeBackground(),
-
+            // Sparkle overlay
+            SparkleOverlay(sparkleController: _sparkleController),
             // Main content
             SafeArea(
               child: Padding(
@@ -209,19 +334,21 @@ class HomeScreen extends StatelessWidget {
                                               title: "🛡️ SCAN & PROTECT",
                                               subtitle: "AI-Powered Content Shield",
                                               gradientColors: const [
-                                                Color(0xFF00FF88),
-                                                Color(0xFF00D4FF),
+                                                Color(0xFF10B981),
+                                                Color(0xFF10B981),
                                               ],
                                               iconData: Icons.security,
                                               onTap: () {
+                                                _stopBackgroundMusic();
                                                 Navigator.push(
                                                   context,
                                                   MaterialPageRoute(
-                                                    builder: (
-                                                        _) => const ContentDetectionPage(),
+                                                    builder: (_) =>
+                                                        ContentDetectionPage(),
                                                   ),
                                                 );
                                               },
+                                              quote: "DETECT FAKE CONTENT LIKE A PRO! 🚀",
                                             ),
                                           ),
                                           const SizedBox(width: 12),
@@ -230,19 +357,21 @@ class HomeScreen extends StatelessWidget {
                                               title: "📊 CYBER INTEL",
                                               subtitle: "Victoria Threat Dashboard",
                                               gradientColors: const [
-                                                Color(0xFFFF3366),
-                                                Color(0xFF9D4EDD),
+                                                Color(0xFF0A4C85),
+                                                Color(0xFF0A4C85),
                                               ],
                                               iconData: Icons.analytics,
                                               onTap: () {
+                                                _stopBackgroundMusic();
                                                 Navigator.push(
                                                   context,
                                                   MaterialPageRoute(
-                                                    builder: (
-                                                        _) => const CyberTrendsPage(),
+                                                    builder: (_) =>
+                                                        CyberTrendsPage(),
                                                   ),
                                                 );
                                               },
+                                              quote: "STAY AHEAD OF ONLINE RISKS! 🔒",
                                             ),
                                           )
                                         ],
@@ -257,41 +386,44 @@ class HomeScreen extends StatelessWidget {
                                               title: "🎯 WISE SWIPE",
                                               subtitle: "Interactive Cyberbullying Quiz Hub",
                                               gradientColors: const [
-                                                Color(0xFFFFDD00),
-                                                Color(0xFFF59E0B),
+                                                Color(0xFFF3B11E),
+                                                Color(0xFFF3B11E),
                                               ],
                                               iconData: Icons.question_answer,
                                               onTap: () {
+                                                _stopBackgroundMusic();
                                                 Navigator.push(
                                                   context,
                                                   MaterialPageRoute(
-                                                    builder: (
-                                                        _) => const ScenarioKnowledgeSelectionPage(),
+                                                    builder: (context) =>
+                                                    const ScenarioKnowledgeSelectionPage(),
                                                   ),
                                                 );
                                               },
+                                              quote: "READY TO MASTER YOUR DIGITAL WORLD? ⚡️",
                                             ),
                                           ),
                                           const SizedBox(width: 12),
                                           Expanded(
                                             child: _GameCard(
-                                              title: "🤖 CYBER GURU",
+                                              title: "🤖 ASK ALLY",
                                               subtitle: "Conversational AI Mentor with Explainer Videos",
                                               gradientColors: const [
-                                                Color(0xFF1877F2),
-                                                Color(0xFF1877F2),
+                                                Color(0xFF10B981),
+                                                Color(0xFF10B981),
                                               ],
                                               iconData: Icons.smart_toy,
                                               onTap: () {
-                                                ScaffoldMessenger
-                                                    .of(context)
-                                                    .showSnackBar(
-                                                  const SnackBar(
-                                                    content: Text(
-                                                        'Cyber Guru chatbot is coming soon!'),
+                                                _stopBackgroundMusic();
+                                                Navigator.push(
+                                                  context,
+                                                  MaterialPageRoute(
+                                                    builder: (context) =>
+                                                    const AskAllyChatbotPage(),
                                                   ),
                                                 );
                                               },
+                                              quote: "YOUR AI COMPANION IS ALWAYS HERE! 💬",
                                             ),
                                           )
                                         ],
@@ -363,70 +495,40 @@ class _CyberWarriorWelcome extends StatelessWidget {
         children: [
           // Gamified tagline with modern gaming aesthetics
           Container(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.all(14), // Increased from 10 to 14
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(20),
-              gradient: LinearGradient(
-                colors: [
-                  Colors.black.withOpacity(0.7),
-                  Colors.black.withOpacity(0.4),
-                ],
-              ),
+              color: Colors.black.withOpacity(0.92),
               border: Border.all(
-                color: const Color(0xFF00FF88).withOpacity(0.6),
+                color: const Color(0xFF10B981), // Added teal border
                 width: 2,
               ),
-              boxShadow: [
-                BoxShadow(
-                  color: const Color(0xFF00FF88).withOpacity(0.3),
-                  blurRadius: 20,
-                  spreadRadius: 2,
-                ),
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.5),
-                  blurRadius: 15,
-                  offset: const Offset(0, 5),
-                ),
-              ],
             ),
             child: ShaderMask(
               shaderCallback: (bounds) =>
-                  const LinearGradient(
+                  LinearGradient(
                     colors: [
-                      Color(0xFF00FF88), // Neon Green
-                      Color(0xFF00D4FF), // Cyber Blue
-                      Color(0xFFFF3366), // Electric Pink
-                      Color(0xFFFFDD00), // Electric Yellow
-                      Color(0xFF9D4EDD), // Gaming Purple
-                      Color(0xFF06FFA5), // Matrix Green
+                      Color(0xFF10B981), // Teal
+                      Color(0xFF0A4C85), // Blue
+                      Color(0xFFF3B11E), // Yellow
+                      Color(0xFFE18616), // Orange
                     ],
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
-                    stops: [0.0, 0.2, 0.4, 0.6, 0.8, 1.0],
                   ).createShader(bounds),
-              child: const Text(
-                'Welcome Cyber Warrior, Your mission to protect yourself starts!',
+              child: Text(
+                'WELCOME CYBER WARRIOR, YOUR MISSION TO PROTECT YOURSELF STARTS!',
                 style: TextStyle(
-                  fontSize: 26,
+                  fontSize: 20,
+                  // Increased from 18 to 20
                   fontWeight: FontWeight.w900,
                   color: Colors.white,
-                  letterSpacing: 1.5,
-                  height: 1.3,
+                  letterSpacing: 1.0,
                   shadows: [
                     Shadow(
-                      blurRadius: 10,
-                      color: Color(0xFF00FF88),
-                      offset: Offset(0, 0),
-                    ),
-                    Shadow(
-                      blurRadius: 20,
-                      color: Color(0xFF00D4FF),
-                      offset: Offset(2, 2),
-                    ),
-                    Shadow(
-                      blurRadius: 30,
-                      color: Colors.black87,
-                      offset: Offset(0, 4),
+                      blurRadius: 4,
+                      color: Colors.black,
+                      offset: Offset(0, 2),
                     ),
                   ],
                 ),
@@ -447,13 +549,13 @@ class _CyberWarriorWelcome extends StatelessWidget {
                   borderRadius: BorderRadius.circular(3),
                   gradient: const LinearGradient(
                     colors: [
-                      Color(0xFF00FF88), // Neon Green
-                      Color(0xFF00D4FF), // Cyber Blue
+                      Color(0xFF10B981), // Teal
+                      Color(0xFF0A4C85), // Blue
                     ],
                   ),
                   boxShadow: [
                     BoxShadow(
-                      color: const Color(0xFF00FF88).withOpacity(0.5),
+                      color: const Color(0xFF10B981).withOpacity(0.5),
                       blurRadius: 8,
                     ),
                   ],
@@ -467,13 +569,13 @@ class _CyberWarriorWelcome extends StatelessWidget {
                   borderRadius: BorderRadius.circular(3),
                   gradient: const LinearGradient(
                     colors: [
-                      Color(0xFFFF3366), // Electric Pink
-                      Color(0xFF9D4EDD), // Gaming Purple
+                      Color(0xFFF3B11E), // Orange
+                      Color(0xFFF7DC6F), // Yellow
                     ],
                   ),
                   boxShadow: [
                     BoxShadow(
-                      color: const Color(0xFFFF3366).withOpacity(0.5),
+                      color: const Color(0xFFF3B11E).withOpacity(0.5),
                       blurRadius: 8,
                     ),
                   ],
@@ -487,13 +589,13 @@ class _CyberWarriorWelcome extends StatelessWidget {
                   borderRadius: BorderRadius.circular(3),
                   gradient: const LinearGradient(
                     colors: [
-                      Color(0xFFFFDD00), // Electric Yellow
-                      Color(0xFF06FFA5), // Matrix Green
+                      Color(0xFF10B981), // Teal
+                      Color(0xFF0A4C85), // Blue
                     ],
                   ),
                   boxShadow: [
                     BoxShadow(
-                      color: const Color(0xFFFFDD00).withOpacity(0.5),
+                      color: const Color(0xFF10B981).withOpacity(0.5),
                       blurRadius: 8,
                     ),
                   ],
@@ -509,9 +611,9 @@ class _CyberWarriorWelcome extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(15),
-              color: const Color(0xFF00FF88).withOpacity(0.2),
+              color: const Color(0xFF10B981).withOpacity(0.2),
               border: Border.all(
-                color: const Color(0xFF00FF88).withOpacity(0.4),
+                color: const Color(0xFF10B981).withOpacity(0.4),
                 width: 1,
               ),
             ),
@@ -520,7 +622,7 @@ class _CyberWarriorWelcome extends StatelessWidget {
               style: TextStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.w700,
-                color: Color(0xFF00FF88),
+                color: Color(0xFF10B981),
                 letterSpacing: 1.2,
               ),
             ),
@@ -531,12 +633,13 @@ class _CyberWarriorWelcome extends StatelessWidget {
   }
 }
 
-class _GameCard extends StatelessWidget {
+class _GameCard extends StatefulWidget {
   final String title;
   final String subtitle;
   final List<Color> gradientColors;
   final IconData iconData;
   final VoidCallback onTap;
+  final String quote;
 
   const _GameCard({
     Key? key,
@@ -545,148 +648,434 @@ class _GameCard extends StatelessWidget {
     required this.gradientColors,
     required this.iconData,
     required this.onTap,
+    required this.quote,
   }) : super(key: key);
 
   @override
+  State<_GameCard> createState() => _GameCardState();
+}
+
+class _GameCardState extends State<_GameCard> {
+  bool _showingQuote = false;
+
+  @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        margin: const EdgeInsets.all(4),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(25),
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              Colors.black.withOpacity(0.8),
-              Colors.black.withOpacity(0.6),
-            ],
-          ),
-          border: Border.all(
-            width: 3,
-            color: gradientColors.first.withOpacity(0.8),
-          ),
-          boxShadow: [
-            // Neon glow effect
-            BoxShadow(
-              color: gradientColors.first.withOpacity(0.4),
-              blurRadius: 20,
-              spreadRadius: 2,
-            ),
-            BoxShadow(
-              color: gradientColors.last.withOpacity(0.3),
-              blurRadius: 30,
-              spreadRadius: 5,
-            ),
-            // Dark shadow for depth
-            BoxShadow(
-              color: Colors.black.withOpacity(0.6),
-              blurRadius: 15,
-              offset: const Offset(0, 8),
-            ),
-          ],
-        ),
-        child: Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(22),
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [
-                gradientColors.first.withOpacity(0.3),
-                gradientColors.last.withOpacity(0.2),
-                Colors.transparent,
+    return Stack(
+      children: [
+        GestureDetector(
+          onTap: () {
+            if (!_showingQuote) {
+              setState(() {
+                _showingQuote = true;
+              });
+              AudioPlayer().play(AssetSource('sounds/lightning_crack.mp3'));
+              Future.delayed(const Duration(seconds: 3), () {
+                widget.onTap();
+                setState(() {
+                  _showingQuote = false;
+                });
+              });
+            }
+          },
+          child: Container(
+            margin: const EdgeInsets.all(4),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(25),
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  Colors.black.withOpacity(0.8),
+                  Colors.black.withOpacity(0.6),
+                ],
+              ),
+              border: Border.all(
+                width: 3,
+                color: widget.gradientColors.first.withOpacity(0.8),
+              ),
+              boxShadow: [
+                // Neon glow effect
+                BoxShadow(
+                  color: widget.gradientColors.first.withOpacity(0.4),
+                  blurRadius: 20,
+                  spreadRadius: 2,
+                ),
+                BoxShadow(
+                  color: widget.gradientColors.last.withOpacity(0.3),
+                  blurRadius: 30,
+                  spreadRadius: 5,
+                ),
+                // Dark shadow for depth
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.6),
+                  blurRadius: 15,
+                  offset: const Offset(0, 8),
+                ),
               ],
-              stops: const [0.0, 0.5, 1.0],
             ),
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Flexible(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(10),
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        gradient: LinearGradient(colors: gradientColors),
-                        boxShadow: [
-                          BoxShadow(
-                            color: gradientColors.first.withOpacity(0.6),
-                            blurRadius: 8,
-                            spreadRadius: 2,
-                          ),
-                        ],
-                      ),
-                      child: Icon(iconData, size: 28, color: Colors.white),
-                    ),
-                    const SizedBox(height: 13),
-                    ShaderMask(
-                      shaderCallback: (bounds) => LinearGradient(
-                        colors: gradientColors,
-                      ).createShader(bounds),
-                      child: Text(
-                        title,
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w900,
-                          color: Colors.white,
-                          letterSpacing: 1.0,
-                        ),
-                        textAlign: TextAlign.center,
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      subtitle,
-                      style: TextStyle(
-                        fontSize: 13.3,
-                        fontWeight: FontWeight.w600,
-                        color: gradientColors.first,
-                        letterSpacing: 0.4,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                    const SizedBox(height: 12),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 7,
-                      ),
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(12),
-                        gradient: LinearGradient(colors: gradientColors),
-                        boxShadow: [
-                          BoxShadow(
-                            color: gradientColors.first.withOpacity(0.4),
-                            blurRadius: 6,
-                            offset: const Offset(0, 2),
-                          ),
-                        ],
-                      ),
-                      child: Text(
-                        "ENTER ⚡",
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w700,
-                          color: Colors.white,
-                          letterSpacing: 1.0,
-                        ),
-                      ),
-                    ),
+            child: Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(22),
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    widget.gradientColors.first.withOpacity(0.3),
+                    widget.gradientColors.last.withOpacity(0.2),
+                    Colors.transparent,
                   ],
+                  stops: const [0.0, 0.5, 1.0],
                 ),
               ),
-            ],
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Flexible(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            gradient: LinearGradient(
+                                colors: widget.gradientColors),
+                            boxShadow: [
+                              BoxShadow(
+                                color: widget.gradientColors.first.withOpacity(
+                                    0.6),
+                                blurRadius: 8,
+                                spreadRadius: 2,
+                              ),
+                            ],
+                          ),
+                          child: Icon(widget.iconData, size: 28, color: Colors
+                              .white),
+                        ),
+                        const SizedBox(height: 13),
+                        ShaderMask(
+                          shaderCallback: (bounds) =>
+                              LinearGradient(
+                                colors: widget.gradientColors,
+                              ).createShader(bounds),
+                          child: Text(
+                            widget.title,
+                            style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w900,
+                              color: Colors.white,
+                              letterSpacing: 1.0,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          widget.subtitle,
+                          style: TextStyle(
+                            fontSize: 13.3,
+                            fontWeight: FontWeight.w600,
+                            color: widget.gradientColors.first,
+                            letterSpacing: 0.4,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                        const SizedBox(height: 12),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 7,
+                          ),
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(12),
+                            gradient: LinearGradient(
+                                colors: widget.gradientColors),
+                            boxShadow: [
+                              BoxShadow(
+                                color: widget.gradientColors.first.withOpacity(
+                                    0.4),
+                                blurRadius: 6,
+                                offset: const Offset(0, 2),
+                              ),
+                            ],
+                          ),
+                          child: Text(
+                            "ENTER ⚡",
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                              color: Colors.white,
+                              letterSpacing: 1.0,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ),
         ),
+        if (_showingQuote)
+          Container(
+            margin: const EdgeInsets.all(4),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(25),
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  Colors.black.withOpacity(0.8),
+                  Colors.black.withOpacity(0.6),
+                ],
+              ),
+              border: Border.all(
+                width: 3,
+                color: widget.gradientColors.first.withOpacity(0.8),
+              ),
+              boxShadow: [
+                // Neon glow effect
+                BoxShadow(
+                  color: widget.gradientColors.first.withOpacity(0.4),
+                  blurRadius: 20,
+                  spreadRadius: 2,
+                ),
+                BoxShadow(
+                  color: widget.gradientColors.last.withOpacity(0.3),
+                  blurRadius: 30,
+                  spreadRadius: 5,
+                ),
+                // Dark shadow for depth
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.6),
+                  blurRadius: 15,
+                  offset: const Offset(0, 8),
+                ),
+              ],
+            ),
+            child: Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(22),
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    widget.gradientColors.first.withOpacity(0.3),
+                    widget.gradientColors.last.withOpacity(0.2),
+                    Colors.transparent,
+                  ],
+                  stops: const [0.0, 0.5, 1.0],
+                ),
+              ),
+              child: Center(
+                child: ShaderMask(
+                  shaderCallback: (bounds) =>
+                      LinearGradient(
+                        colors: [
+                          widget.gradientColors.first,
+                          widget.gradientColors.last,
+                        ],
+                        begin: Alignment.centerLeft,
+                        end: Alignment.centerRight,
+                      ).createShader(bounds),
+                  child: Text(
+                    widget.quote,
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w900,
+                      color: Colors.white,
+                      letterSpacing: 1.0,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+class AskAllyComingSoonPage extends StatelessWidget {
+  const AskAllyComingSoonPage({Key? key}) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        backgroundColor: Colors.white,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(
+              Icons.arrow_back_ios_new_rounded, color: Color(0xFF0A4C85)),
+          onPressed: () => Navigator.of(context).pop(),
+        ),
       ),
+      backgroundColor: Colors.white,
+      body: const Center(
+        child: Text(
+          'ASK ALLY - AI CHATBOT COMING SOON',
+          style: TextStyle(
+            fontFamily: 'Montserrat',
+            fontWeight: FontWeight.w900,
+            fontSize: 23,
+            letterSpacing: 1.6,
+            color: Color(0xFF0A4C85),
+          ),
+          textAlign: TextAlign.center,
+        ),
+      ),
+    );
+  }
+}
+
+class SparkleOverlay extends StatefulWidget {
+  final AnimationController sparkleController;
+
+  const SparkleOverlay({Key? key, required this.sparkleController})
+      : super(key: key);
+
+  @override
+  _SparkleOverlayState createState() => _SparkleOverlayState();
+}
+
+class _MovingEmoji {
+  double x;
+  double y;
+  double speed;
+  double size;
+  String type;
+
+  _MovingEmoji(
+      {required this.x, required this.y, required this.speed, required this.size, required this.type});
+}
+
+class _SparkleOverlayState extends State<SparkleOverlay>
+    with TickerProviderStateMixin {
+  late AnimationController _animationController;
+  late Animation<double> _sparkleAnimation;
+  final List<String> _emojiList = [
+    '🛡️',
+    '⚡',
+    '💬',
+    '👾',
+    '🧑‍💻',
+    '🏆',
+  ];
+  late List<_MovingEmoji> _emojis;
+
+  @override
+  void initState() {
+    super.initState();
+    _animationController = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 2),
+    )
+      ..addListener(() {
+        setState(() {});
+      })
+      ..repeat();
+
+    // Create animation for sparkle particles
+    _sparkleAnimation = Tween<double>(begin: 0, end: 1).animate(
+      CurvedAnimation(parent: widget.sparkleController, curve: Curves.linear),
+    );
+
+    _initEmojis();
+  }
+
+  void _initEmojis() {
+    final w = WidgetsBinding.instance.window.physicalSize.width /
+        WidgetsBinding.instance.window.devicePixelRatio;
+    final h = WidgetsBinding.instance.window.physicalSize.height /
+        WidgetsBinding.instance.window.devicePixelRatio;
+    _emojis = List.generate(10, (i) {
+      return _MovingEmoji(
+        x: Random().nextDouble() * w,
+        y: h - Random().nextDouble() * 64,
+        speed: 80 + Random().nextDouble() * 140,
+        size: 20 + Random().nextDouble() * 22,
+        type: _emojiList[Random().nextInt(_emojiList.length)],
+      );
+    });
+  }
+
+  @override
+  void dispose() {
+    _animationController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // Update emoji positions
+    for (var i = 0; i < _emojis.length; i++) {
+      _emojis[i].y -= _emojis[i].speed * 0.016;
+      if (_emojis[i].y < -_emojis[i].size) {
+        final w = WidgetsBinding.instance.window.physicalSize.width /
+            WidgetsBinding.instance.window.devicePixelRatio;
+        final h = WidgetsBinding.instance.window.physicalSize.height /
+            WidgetsBinding.instance.window.devicePixelRatio;
+        _emojis[i] = _MovingEmoji(
+          x: Random().nextDouble() * w,
+          y: h - Random().nextDouble() * 64,
+          speed: 80 + Random().nextDouble() * 140,
+          size: 20 + Random().nextDouble() * 22,
+          type: _emojiList[Random().nextInt(_emojiList.length)],
+        );
+      }
+    }
+
+    return AnimatedBuilder(
+      animation: Listenable.merge(
+          [_animationController, widget.sparkleController]),
+      builder: (context, child) {
+        return Stack(
+          children: [
+            // Intro-style sparkle particles
+            ...List.generate(15, (index) {
+              final offset = (_sparkleAnimation.value * 2 * 3.14159 +
+                  index * 0.4) % (2 * 3.14159);
+              return Positioned(
+                left: 50 + (index % 5) * 80.0 + 30 * sin(offset),
+                top: 100 + (index ~/ 5) * 150.0 + 20 * cos(offset * 1.5),
+                child: Container(
+                  width: 4,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: [
+                      const Color(0xFF176CB8), // electric blue
+                      const Color(0xFF127C82), // teal
+                      const Color(0xFFF3B11E), // yellow
+                      const Color(0xFFE18616), // orange
+                    ][index % 4].withOpacity(0.7 + 0.3 * sin(offset)),
+                    shape: BoxShape.circle,
+                  ),
+                ),
+              );
+            }),
+            // Existing emoji particles going up
+            for (int i = 0; i < _emojis.length; i++)
+              Positioned(
+                left: _emojis[i].x,
+                top: _emojis[i].y,
+                child: Text(
+                  _emojis[i].type,
+                  style: TextStyle(
+                    fontSize: _emojis[i].size,
+                    color: Color(0xFF10B981),
+                  ),
+                ),
+              ),
+          ],
+        );
+      },
     );
   }
 }

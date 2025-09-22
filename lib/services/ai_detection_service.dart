@@ -1,7 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
 import 'package:http/http.dart' as http;
-import 'package:uuid/uuid.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 class AiCategorySeverity {
@@ -147,13 +146,12 @@ Map<String, String> _mapSeverityToText(int severity) {
 
 class AiDetectionService {
   final String baseUrl;
-  final Uuid _uuid = Uuid();
   AiDetectionService(this.baseUrl);
 
   Future<AiDetectionResult> analyzeText(String text) async {
     final uri = Uri.parse('$baseUrl/moderate-text');
     final reportId = _uuid.v4();
-    final supabaseAnonKey = dotenv.env['SUPABASE_ANON_KEY'] ?? '';
+    final azureApiKey = dotenv.env['AZURE_API_KEY'] ?? '';
 
     print('DEBUG: analyzeText called');
     print('DEBUG: URI = $uri');
@@ -164,7 +162,7 @@ class AiDetectionService {
       uri,
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': 'Bearer $supabaseAnonKey',
+        'x-functions-key': azureApiKey,
       },
       body: jsonEncode({
         'report_id': reportId,
@@ -183,8 +181,7 @@ class AiDetectionService {
 
   Future<AiDetectionResult> analyzeScreenshot(File imageFile) async {
     final uri = Uri.parse('$baseUrl/process-screenshot');
-    final reportId = _uuid.v4();
-    final supabaseAnonKey = dotenv.env['SUPABASE_ANON_KEY'] ?? '';
+    final azureApiKey = dotenv.env['AZURE_API_KEY'] ?? '';
 
     print('DEBUG: analyzeScreenshot called');
     print('DEBUG: URI = $uri');
@@ -192,8 +189,7 @@ class AiDetectionService {
     print('DEBUG: Image path = ${imageFile.path}');
 
     final req = http.MultipartRequest('POST', uri)
-      ..headers['Authorization'] = 'Bearer $supabaseAnonKey';
-    req.fields['report_id'] = reportId;
+      ..headers['x-functions-key'] = azureApiKey;
     req.files.add(await http.MultipartFile.fromPath('file', imageFile.path));
     final streamed = await req.send();
     final body = await streamed.stream.bytesToString();

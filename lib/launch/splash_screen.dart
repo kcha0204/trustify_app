@@ -1,5 +1,6 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:audioplayers/audioplayers.dart';
 import 'intro_screens.dart';
 
 class SplashScreen extends StatefulWidget {
@@ -13,10 +14,14 @@ class _SplashScreenState extends State<SplashScreen>
     with SingleTickerProviderStateMixin {
   late final AnimationController _c;
   bool _navigated = false;
+  final AudioPlayer _audioPlayer = AudioPlayer();
 
   @override
   void initState() {
     super.initState();
+
+    // Play splash sound
+    _audioPlayer.play(AssetSource('sounds/splash.mp3'));
 
     // Initialize animation controller
     _c = AnimationController(
@@ -55,6 +60,8 @@ class _SplashScreenState extends State<SplashScreen>
 
   @override
   void dispose() {
+    _audioPlayer.stop();
+    _audioPlayer.dispose();
     _c.dispose();
     super.dispose();
   }

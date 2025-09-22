@@ -37,13 +37,16 @@ dependencies:
   
   # Image picker for content detection functionality
   image_picker: ^1.0.7
-  http: ^1.2.0
-  supabase_flutter: ^2.6.0
+  http: ^1.2.1
   google_fonts: ^6.1.0
   uuid: ^4.3.3
-  flutter_dotenv: ^5.1.0
+  flutter_dotenv: ^5.2.1
   webview_flutter: ^4.4.2
+  flutter_inappwebview: ^6.0.0
   fl_chart: ^0.66.2
+  audioplayers: ^6.5.1
+  youtube_player_flutter: ^9.1.2
+  csv: ^5.1.1
 
 dev_dependencies:
   flutter_test:
@@ -84,11 +87,22 @@ flutter:
     - assets/splash/splash_bg.jpg
     - assets/splash/cyberbullying_social_bg.jpg
     - assets/aftersplash/after_splash_bg.jpeg
-    - assets/aftersplash/Page 1.jpeg
-    - assets/aftersplash/Page 2.jpeg
-    - assets/aftersplash/Page 3.jpeg
-    - assets/aftersplash/Page 4.jpeg
+    - assets/aftersplash/page_1.png
+    - assets/aftersplash/page_2.png
+    - assets/aftersplash/page_3.png
+    - assets/aftersplash/page_4.png
     - .env
+    - assets/sounds/tap.wav
+    - assets/sounds/start_jingle.wav
+    - assets/sounds/lightning_crack.mp3
+    - assets/sounds/game_idle.mp3
+    - assets/sounds/intro_swipe.wav
+    - assets/sounds/reward.wav
+    - assets/sounds/splash.mp3
+    - assets/sounds/loose.wav
+    - assets/sounds/win.wav
+
+    - backend/quizzes/all_questions.csv
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images
 

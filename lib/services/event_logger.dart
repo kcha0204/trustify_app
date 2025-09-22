@@ -1,4 +1,3 @@
-import 'package:supabase_flutter/supabase_flutter.dart';
 import 'dart:math';
 
 class EventLogger {
@@ -24,44 +23,13 @@ class EventLogger {
     required String category,
     List<double>? embedding,
   }) async {
-    final data = {
-      'content_type': type,
-      'preview': preview,
-      'ai_label': aiLabel,
-      'ai_score': aiScore,
-      'category': category,
-      'session_id': sessionId,
-      if (embedding != null) 'embedding': embedding,
-    };
-    try {
-      await Supabase.instance.client
-          .from('content_events')
-          .insert(data);
-    } on PostgrestException catch (e) {
-      throw Exception('Failed to log event: ${e.message}');
-    } catch (e) {
-      throw Exception('Failed to log event: $e');
-    }
-    // You can return the id or whatever if you like
+    // TODO: Add Azure analytics/event logging implementation (or alternative).
   }
 
   /// Fetch the latest detection events for debugging or trend stats
   static Future<List<Map<String, dynamic>>> fetchRecentEvents(
       {int limit = 10}) async {
-    try {
-      final List<dynamic> rows = await Supabase.instance.client
-          .from('content_events')
-          .select()
-          .order('inserted_at', ascending: false)
-          .limit(limit);
-
-      return rows
-          .map<Map<String, dynamic>>((e) => Map<String, dynamic>.from(e))
-          .toList();
-    } on PostgrestException catch (e) {
-      throw Exception('Failed to fetch events: ${e.message}');
-    } catch (e) {
-      throw Exception('Failed to fetch events: $e');
-    }
+    // TODO: Add Azure analytics/event logging implementation (or alternative).
+    return [];
   }
 }
