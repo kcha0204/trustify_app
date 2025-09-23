@@ -1,3 +1,11 @@
+// File: lib/launch/cyber_trends_page.dart
+// Purpose: VCAMS dashboard screen. Fetches indicators and data from Azure
+// Functions and renders Statewide Trend and Breakdown charts with dynamic
+// legend/axis boxes and teen‑friendly analysis that reacts to filters.
+// Key responsibilities:
+// - Manage filters (indicator, subdivision type/values, years)
+// - Draw line (trend) and bar/pie (breakdown) with adaptive labels/height
+// - Build analysis/legend/axis label boxes from live chart values
 import 'dart:ui';
 import 'dart:math';
 import 'package:flutter/material.dart';

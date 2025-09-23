@@ -1,3 +1,6 @@
+// File: lib/services/event_logger.dart
+// Purpose: Minimal event logging utilities for quizzes/navigation/errors.
+// Notes: Placeholder methods for wiring to analytics later.
 import 'dart:math';
 
 class EventLogger {
