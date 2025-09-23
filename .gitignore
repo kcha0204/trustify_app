@@ -44,7 +44,11 @@ app.*.map.json
 /android/app/profile
 /android/app/release
 
-# Ignore env/secret files
+# Secrets and environment files (do not commit)
 .env
-**/.env
 *.env
+backend/.env
+
+# Allow example env templates
+!.env.example
+!backend/.env.example

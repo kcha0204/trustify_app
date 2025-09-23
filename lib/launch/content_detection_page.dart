@@ -1,3 +1,10 @@
+// File: lib/launch/content_detection_page.dart
+// Purpose: Scan & Protect screen for text and images. Calls Azure Analysis
+// Function for moderation, including SAS image upload + polling.
+// Key responsibilities:
+// - Validate input, trigger text analysis or image selection
+// - Image flow: GET SAS → PUT to Blob → poll get_results
+// - Render category risk cards and supportive guidance
 import 'dart:ui';
 import 'dart:io';
 import 'dart:async';

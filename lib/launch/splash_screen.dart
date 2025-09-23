@@ -1,4 +1,8 @@
 import 'dart:ui';
+
+// File: lib/launch/splash_screen.dart
+// Purpose: Simple splash that shows brand and transitions to Home/Intro.
+// Notes: Minimal logic; keeps first paint smooth.
 import 'package:flutter/material.dart';
 import 'package:audioplayers/audioplayers.dart';
 import 'intro_screens.dart';

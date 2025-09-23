@@ -1,7 +1,15 @@
+// File: lib/services/ai_detection_service.dart
+// Purpose: Shared helpers and models for mapping provider moderation output 
+// (Azure Content Safety compatible) to trustify-friendly messages, risk levels,
+// and emoji-coded severities.
+// Notes:
+// - AiDetectionResult composes a friendly summary and normalized risk level
+// - _mapSeverityToText converts integer severities to labels
 import 'dart:convert';
 import 'dart:io';
 import 'package:http/http.dart' as http;
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:uuid/uuid.dart';
 
 class AiCategorySeverity {
   final String category;
@@ -147,6 +155,8 @@ Map<String, String> _mapSeverityToText(int severity) {
 class AiDetectionService {
   final String baseUrl;
   AiDetectionService(this.baseUrl);
+
+  static final Uuid _uuid = Uuid();
 
   Future<AiDetectionResult> analyzeText(String text) async {
     final uri = Uri.parse('$baseUrl/moderate-text');

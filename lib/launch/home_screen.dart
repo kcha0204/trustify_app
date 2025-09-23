@@ -1,3 +1,11 @@
+// File: lib/launch/home_screen.dart
+// Purpose: Landing screen showing four primary features (Scan & Protect, 
+// Cyber Intel dashboard, Quiz Hub, Ask Ally chatbot). Manages background audio 
+// and high‑level navigation.
+// Key responsibilities:
+// - Start/stop background soundtrack based on lifecycle/navigation
+// - Animate and render the feature cards with neon style
+// - Route to respective screens on tap
 import 'dart:math';
 import 'dart:ui';
 import 'package:flutter/material.dart';

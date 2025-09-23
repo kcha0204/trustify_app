@@ -1,4 +1,6 @@
-// sexual_scenario_quiz_page.dart
+// File: lib/launch/sexual_scenario_quiz_page.dart
+// Purpose: Scenario quiz screen for Sexual content category.
+// Notes: Role‑play choices with supportive corrective feedback.
 import 'package:flutter/material.dart';
 import 'dart:async';
 import 'dart:ui';

@@ -1,3 +1,10 @@
+// File: lib/main.dart
+// Purpose: Flutter app entry point. Loads environment variables, sets theme and
+// routes, and boots the initial splash/home navigation.
+// Key responsibilities:
+// - Loads .env for Azure Function endpoints/keys
+// - Provides a global RouteObserver for screen analytics
+// - Centralizes routing to Splash and Home screens
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'launch/splash_screen.dart';
