@@ -47,6 +47,9 @@ dependencies:
   audioplayers: ^6.5.1
   youtube_player_flutter: ^9.1.2
   csv: ^5.1.1
+  shared_preferences: ^2.3.2
+  flutter_local_notifications: ^17.2.3
+  timezone: ^0.9.4
 
 dev_dependencies:
   flutter_test:
@@ -90,6 +93,7 @@ flutter:
     - assets/aftersplash/page_1.png
     - assets/aftersplash/page_2.png
     - assets/aftersplash/page_3.png
+    - assets/aftersplash/page_3.5.png
     - assets/aftersplash/page_4.png
     - .env
     - assets/sounds/tap.wav
@@ -103,6 +107,8 @@ flutter:
     - assets/sounds/win.wav
 
     - backend/quizzes/all_questions.csv
+    - assets/random_text/cyberbullying_teens_cleaned.csv
+    - assets/random_images/
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images
 

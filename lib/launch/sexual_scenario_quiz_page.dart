@@ -5,7 +5,8 @@ import 'package:flutter/material.dart';
 import 'dart:async';
 import 'dart:ui';
 import 'package:audioplayers/audioplayers.dart';
-import 'ask_ally_chatbot_page.dart'; // new import
+import '../services/badge_service.dart';
+import 'ask_ally_chatbot_page.dart';
 
 const Map<String, Color> optionColors = {
   'Report': Color(0xFFFF6B6B), // bright red
@@ -32,6 +33,7 @@ class _SexualScenarioQuizPageState extends State<SexualScenarioQuizPage> {
   Timer? _popupTimer;
   final AudioPlayer _quizAudioPlayer = AudioPlayer();
   bool _allCorrect = true;
+  List<bool> _answered = List.filled(6, false); // Track answered questions
 
   // All scenarios for "Sexual Abuse" category
   final List<Map<String, dynamic>> _scenarios = [
@@ -101,11 +103,7 @@ class _SexualScenarioQuizPageState extends State<SexualScenarioQuizPage> {
       _correctAnswer = correctAnswer;
     });
     _popupTimer?.cancel();
-    _popupTimer = Timer(const Duration(seconds: 5), () {
-      setState(() {
-        _popupVisible = false;
-      });
-    });
+    // No timer for popup autoclose
   }
 
   void _showCorrectPopupFromIncorrect(String reason, String correctAnswer) {
@@ -117,56 +115,68 @@ class _SexualScenarioQuizPageState extends State<SexualScenarioQuizPage> {
       _correctAnswer = correctAnswer;
     });
     _popupTimer?.cancel();
-    _popupTimer = Timer(const Duration(seconds: 5), () {
-      setState(() {
-        _popupVisible = false;
-      });
-    });
+    // No timer
   }
 
-  void _onSelectOption(String option, int q) {
+  Future<void> _onSelectOption(String option, int q) async {
     _quizAudioPlayer.play(AssetSource('sounds/tap.wav'));
     final scenario = _scenarios[q];
     final isCorrect = option == scenario["correct"];
     if (!isCorrect) _allCorrect = false;
+    _answered[q] = true;
     _showPopup(isCorrect, scenario["reason"], scenario["correct"]);
-    if (q == _scenarios.length - 1 && _allCorrect) {
-      Future.delayed(const Duration(milliseconds: 350), () async {
-        await showDialog(
-            context: context,
-            barrierDismissible: false,
-            builder: (ctx) {
-              _quizAudioPlayer.play(AssetSource('sounds/reward.wav'));
-              Future.delayed(const Duration(milliseconds: 1000), () {
-                if (Navigator.of(ctx, rootNavigator: true).canPop()) Navigator
-                    .of(ctx, rootNavigator: true).pop();
-              });
-              return Center(
-                child: Material(
-                  color: Colors.transparent,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                        vertical: 30, horizontal: 34),
-                    decoration: BoxDecoration(
-                      color: Colors.orange.withOpacity(0.9),
-                      borderRadius: BorderRadius.circular(30),
-                    ),
-                    child: Text(
-                      'Wohooo! You nailed the streak! ',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w800,
-                        fontSize: 19,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                  ),
-                ),
-              );
-            }
-        );
-      });
+
+    // Check if this is the last question
+    if (q == _scenarios.length - 1) {
+      if (_allCorrect) {
+        await BadgeService().addStreak('Streak Quiz Sexual Scenario Completed');
+        await BadgeService().addStreak('Streak Quiz Sexual Scenario Perfect');
+        await _showCompletionPopup(true);
+      } else {
+        await BadgeService().addStreak('Streak Quiz Sexual Scenario Completed');
+        await _showCompletionPopup(false);
+      }
     }
+  }
+
+  Future<void> _showCompletionPopup(bool isPerfect) async {
+    _quizAudioPlayer.play(AssetSource('sounds/reward.wav'));
+    await showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (ctx) {
+          Future.delayed(const Duration(seconds: 2), () {
+            if (Navigator.of(ctx, rootNavigator: true).canPop()) {
+              Navigator.of(ctx, rootNavigator: true).pop();
+            }
+          });
+          return Center(
+            child: Material(
+              color: Colors.transparent,
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                    vertical: 30, horizontal: 34),
+                decoration: BoxDecoration(
+                  color: isPerfect ? Colors.green.withOpacity(0.9) : Colors
+                      .orange.withOpacity(0.9),
+                  borderRadius: BorderRadius.circular(30),
+                ),
+                child: Text(
+                  isPerfect
+                      ? 'Woohoo! You earned 2 streaks! 🎉'
+                      : 'Woohoo! You earned a streak! 🎉',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w800,
+                    fontSize: 19,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ),
+          ),
+        );
+      }
+    );
   }
 
   void _onClosePopup() {
@@ -235,6 +245,30 @@ class _SexualScenarioQuizPageState extends State<SexualScenarioQuizPage> {
                           color: Colors.white,
                           fontWeight: FontWeight.w500),
                       textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 10),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.white,
+                          foregroundColor: Color(0xFF176CB8),
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10)),
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                        ),
+                        onPressed: () {
+                          Navigator.of(context, rootNavigator: true).pop();
+                          Navigator.of(context).push(
+                              MaterialPageRoute(
+                                  builder: (_) => const AskAllyChatbotPage()));
+                        },
+                        child: const Text(
+                          "Click here to know more",
+                          style: TextStyle(
+                              fontWeight: FontWeight.bold, fontSize: 16),
+                        ),
+                      ),
                     ),
                   ] else
                     ...[
@@ -404,7 +438,9 @@ class _SexualScenarioQuizPageState extends State<SexualScenarioQuizPage> {
           left: 0,
           right: 0,
           child: AnimatedOpacity(
-            opacity: _popupVisible ? 0 : 1,
+            opacity: _popupVisible || _currentIndex == _scenarios.length - 1
+                ? 0
+                : 1,
             duration: const Duration(milliseconds: 180),
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -447,7 +483,8 @@ class _SexualScenarioQuizPageState extends State<SexualScenarioQuizPage> {
         ? Colors.white
         : const Color(0xFF0A4C85); // navy text for 'Support'
     return GestureDetector(
-      onTap: _popupVisible ? null : () => _onSelectOption(label, q),
+      onTap: _popupVisible || _answered[q] ? null : () =>
+          _onSelectOption(label, q),
       child: Container(
         alignment: Alignment.center,
         margin: EdgeInsets.zero,
@@ -476,7 +513,10 @@ class _SexualScenarioQuizPageState extends State<SexualScenarioQuizPage> {
       body: PageView.builder(
         controller: _pageController,
         scrollDirection: Axis.vertical,
-        physics: const BouncingScrollPhysics(),
+        physics: _answered[_currentIndex]
+            ? const BouncingScrollPhysics()
+            : const NeverScrollableScrollPhysics(),
+        // disable swipe
         itemCount: _scenarios.length,
         onPageChanged: (i) {
           setState(() {
