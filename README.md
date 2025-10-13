@@ -36,6 +36,11 @@ access to data, and content safety.
 * Azure SQL Database with VCAMS table/view:
   `state, indicator, subdivision_type, subdivision_value, year, value`
 
+### Security & CI Testing
+
+- Set up CodeQL workflow in .github
+- Use MobSF, Kali, apktool, etc., (see Security above) for APK audits before release
+
 ## Setup Instructions
 
 ### 1) Clone
@@ -114,6 +119,20 @@ Function (securely with a function key), and displays AI‑driven feedback withi
 - Sexual Abuse
 - Violence
 
+## **NEW: Robust Badge & Streak System**
+
+- Each feature (Scan & Protect, Wise Swipe, RandRisk, Ask Ally) now tracks streaks with a unique,
+  non-overlapping tag in persistent local storage.
+- Streaks update and display INSTANTLY in the badge popup, home screen, and all breakdowns; never
+  reset or overlap unless explicitly cleared.
+- **Streak logic clarity:**
+  - **Scan & Protect:** Each scan (text or image) = 1 streak
+  - **RandRisk:** Each scenario tap = 1 streak
+  - **Wise Swipe:** Finish a quiz (any category): 1 streak. If all answers correct: +1 for
+    perfection (2 total)
+  - **Ask Ally:** Video = 1 streak; quiz attempt (not perfect) = 1; quiz perfect = 2 (never stacked)
+- **Badge breakdown (dialog page 2):** Always matches the per-feature streaks, instantly updated.
+- **Home screen:** Streak count shows right of badge, colored by badge level, always current.
 
 ## Services (in the app)
 
@@ -160,6 +179,10 @@ This is NOT required for the Flutter app.
 * [ ] Offline mode for basic detection
 * [ ] Parent/teacher dashboard
 * [ ] Real‑time chat guidance & reporting
+* [ ] Per-category analytics in Wise Swipe
+* [ ] Web app support / desktop
+* [ ] Enhanced report generation/export
+* [ ] Multi-user/cloud-synced streak profiles
 
 ## Contributing
 1. Fork the repository
@@ -172,6 +195,12 @@ This is NOT required for the Flutter app.
 For support and questions:
 - Create an issue on GitHub
 - Check Azure Functions and Azure Content Safety documentation
+
+## Security & Testing Workflow
+
+- Automated CodeQL for code scanning
+- Pen-testing with MobSF, apktool, dex2jar, JD-GUI, Kali Linux
+- See infrastructure docs for feedback/triage loop
 
 ## Acknowledgments
 
