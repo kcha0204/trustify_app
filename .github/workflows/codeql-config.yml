@@ -1,0 +1,15 @@
+name: "Trustify CodeQL config"
+queries:
+  - uses: security-extended
+paths:
+  - backend/
+  - backend/functions/
+  - backend/dashboard/
+paths-ignore:
+  - lib/**            # Flutter/Dart (not supported by CodeQL)
+  - "**/*.dart"
+  - android/**
+  - ios/**
+  - web/**
+  - build/**
+  - .dart_tool/**
